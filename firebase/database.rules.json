@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "fcm_tokens": {
+      "$token": {
+        ".read": false,
+        ".write": false,
+        ".indexOn": ["timestamp"]
+      }
+    },
+    "notification_logs": {
+      "$logId": {
+        ".read": false,
+        ".write": false,
+        ".indexOn": ["timestamp", "slotId"]
+      }
+    }
+  }
+}

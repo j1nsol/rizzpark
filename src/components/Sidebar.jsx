@@ -63,19 +63,14 @@ export default function Sidebar({
           </div>
 
           <div className="stat-box full">
-            <div className="s-label">Occupancy</div>
-            <div className="s-val">
-              {occPct}<span style={{ fontSize: '15px', fontWeight: 400 }}>%</span>
-            </div>
-            <div className="occ-bar" style={{ marginTop: '8px', background: 'rgba(0,0,0,.08)' }}>
-              <div
-                style={{
-                  height: '100%', width: `${occPct}%`,
-                  background: 'var(--occupied)', borderRadius: '2px', transition: 'width .6s ease',
-                }}
-              />
-            </div>
-          </div>
+  <div className="s-label">Occupancy</div>
+  <div className="s-val">
+    {occPct}<span style={{ fontSize: '15px', fontWeight: 400 }}>%</span>
+  </div>
+  <div className="occ-bar">
+    <div className="occ-fill" style={{ width: `${occPct}%` }} />
+  </div>
+</div>
         </div>
       </div>
 

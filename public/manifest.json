@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Rizz Park",
+  "name": "Rizz Park - Smart Parking",
+  "description": "Real-time parking availability notifications for smart parking management",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,67 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait",
+  "theme_color": "#F5A623",
+  "background_color": "#ffffff",
+  "scope": "/",
+  "categories": ["utilities", "productivity", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "screenshot2.png", 
+      "sizes": "375x667",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "View Parking Map",
+      "short_name": "Parking Map",
+      "description": "View real-time parking availability",
+      "url": "/",
+      "icons": [
+        {
+          "src": "logo192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+rizzpark",
+      "url": "/?handler=%s"
+    }
+  ]
 }

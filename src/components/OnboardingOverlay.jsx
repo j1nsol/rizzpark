@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useFCM } from '../hooks/useFCM';
 import { isMobile, isIOS, ONBOARDING_KEY } from '../utils/parking';
 
 // ── Shared header ─────────────────────────────────────────────────────────────
@@ -19,19 +20,29 @@ function ObHeader({ stepLabel }) {
 
 // ── Desktop flow ──────────────────────────────────────────────────────────────
 function DesktopCard({ onDismiss }) {
+  const fcm = useFCM();
   const [phase, setPhase] = useState('idle'); // idle | requesting | granted | denied
 
   async function handleAllow() {
     setPhase('requesting');
     try {
-      const perm = await Notification.requestPermission();
-      if (perm === 'granted') {
+      // Use FCM for push notifications if supported
+      if (fcm.isSupported) {
+        await fcm.requestPermission();
         localStorage.setItem('rizzpark_notif', 'granted');
         setPhase('granted');
       } else {
-        setPhase('denied');
+        // Fallback to browser notifications
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          localStorage.setItem('rizzpark_notif', 'granted');
+          setPhase('granted');
+        } else {
+          setPhase('denied');
+        }
       }
-    } catch {
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
       setPhase('idle');
     }
   }

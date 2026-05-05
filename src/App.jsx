@@ -10,6 +10,7 @@ import {
 } from './components/TweaksPanel';
 import { useTweaks }         from './hooks/useTweaks';
 import { useFirebaseSlots }  from './hooks/useFirebaseSlots';
+import { useFCM }            from './hooks/useFCM';
 import {
   canNotify, isGranted, requestPerm, fireNotif, ONBOARDING_KEY,
 } from './utils/parking';
@@ -23,6 +24,7 @@ const TWEAK_DEFAULTS = {
 export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const { slots, fbStatus, showSelectedBox } = useFirebaseSlots();
+  const fcm = useFCM();
 
   const [selectedId,     setSelectedId]     = useState(null);
   const [filter,         setFilter]         = useState('all');
@@ -37,22 +39,55 @@ export default function App() {
   const toastId      = useRef(0);
   const prevSlotsRef = useRef([]);
 
-  // Restore notification preference from localStorage
+  // Update notification permission state based on FCM
   useEffect(() => {
-    const saved = localStorage.getItem('rizzpark_notif');
-    if (saved === 'granted' && isGranted()) setNotifPerm('granted');
-  }, []);
+    if (fcm.permission) {
+      setNotifPerm(fcm.permission);
+    }
+  }, [fcm.permission]);
 
-  // Detect occupied→vacant transitions and fire browser notifications + toasts
+  // Handle FCM messages when app is in foreground
+  useEffect(() => {
+    if (!fcm.token) return;
+
+    const unsubscribe = fcm.onMessage((payload) => {
+      console.log('Received FCM message in foreground:', payload);
+      
+      // Extract slot data from message
+      const slotData = payload.data || {};
+      const slotId = slotData.slotId;
+      const row = slotData.row;
+
+      // Show toast notification for foreground messages
+      if (slotId && row) {
+        spawnToast(slotId, row);
+      }
+    });
+
+    return unsubscribe;
+  }, [fcm.token, fcm.onMessage]);
+
+  // Detect occupied→vacant transitions and fire notifications + toasts
   useEffect(() => {
     if (!prevSlotsRef.current.length) {
       prevSlotsRef.current = slots;
       return;
     }
     const prevById = Object.fromEntries(prevSlotsRef.current.map(s => [s.id, s]));
-    slots
-      .filter(s => prevById[s.id]?.status === 'occupied' && s.status === 'vacant')
-      .forEach(s => { fireNotif(s); spawnToast(s.id, s.row); });
+    const changedSlots = slots.filter(s => 
+      prevById[s.id]?.status === 'occupied' && s.status === 'vacant'
+    );
+    
+    changedSlots.forEach(s => { 
+      // Show browser notification as fallback
+      fireNotif(s); 
+      // Show in-app toast
+      spawnToast(s.id, s.row); 
+      
+      // FCM push notifications are handled by Cloud Functions
+      // when slot status changes in Firebase Realtime Database
+    });
+    
     prevSlotsRef.current = slots;
   }, [slots]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -93,10 +128,22 @@ export default function App() {
 
   async function handleNotif() {
     if (notifPerm === 'granted') return;
-    const ok   = await requestPerm();
-    const perm = ok ? 'granted' : 'denied';
-    setNotifPerm(perm);
-    localStorage.setItem('rizzpark_notif', perm);
+    
+    try {
+      // Use FCM for push notifications if supported
+      if (fcm.isSupported) {
+        await fcm.requestPermission();
+        localStorage.setItem('rizzpark_notif', 'granted');
+      } else {
+        // Fallback to browser notifications
+        const ok = await requestPerm();
+        const perm = ok ? 'granted' : 'denied';
+        setNotifPerm(perm);
+        localStorage.setItem('rizzpark_notif', perm);
+      }
+    } catch (error) {
+      console.error('Failed to request notification permission:', error);
+    }
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────

@@ -57,14 +57,70 @@ export async function requestPerm() {
   return (await Notification.requestPermission()) === 'granted';
 }
 
+// Get user notification settings from localStorage
+export function getNotificationSettings() {
+  try {
+    const saved = localStorage.getItem('rizzpark_notification_settings');
+    return saved ? JSON.parse(saved) : {
+      enabled: true,
+      slotAvailable: true,
+      quietHours: false,
+      quietStart: '22:00',
+      quietEnd: '08:00',
+      soundEnabled: true,
+      vibrationEnabled: true,
+    };
+  } catch (error) {
+    console.error('Failed to load notification settings:', error);
+    return {
+      enabled: true,
+      slotAvailable: true,
+      quietHours: false,
+      quietStart: '22:00',
+      quietEnd: '08:00',
+      soundEnabled: true,
+      vibrationEnabled: true,
+    };
+  }
+}
+
+// Check if current time is within quiet hours
+export function isQuietHours() {
+  const settings = getNotificationSettings();
+  if (!settings.quietHours) return false;
+  
+  const now = new Date();
+  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  
+  return currentTime >= settings.quietStart || currentTime <= settings.quietEnd;
+}
+
+// Check if notifications should be shown based on user preferences
+export function shouldShowNotification() {
+  const settings = getNotificationSettings();
+  return settings.enabled && settings.slotAvailable && !isQuietHours();
+}
+
 export function fireNotif(slot) {
   if (!isGranted()) return;
-  if (document.visibilityState !== 'visible') return;
-  new Notification('Rizz Park — Slot Available!', {
+  if (!shouldShowNotification()) return;
+  
+  const settings = getNotificationSettings();
+  
+  // Create notification options
+  const options = {
     body: `Slot ${slot.id} (Row ${slot.row}) just opened up.`,
     icon: `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F5A623'/><text x='7' y='22' font-size='18' fill='white' font-family='sans-serif' font-weight='bold'>P</text></svg>`,
     tag: `slot-${slot.id}`,
-  });
+    requireInteraction: true,
+    silent: !settings.soundEnabled,
+    vibrate: settings.vibrationEnabled ? [200, 100, 200] : undefined,
+  };
+
+  // Only show if page is visible (FCM handles background notifications)
+  if (document.visibilityState === 'visible') {
+    new Notification('Rizz Park — Slot Available!', options);
+  }
 }
 
 // ── Device detection ──────────────────────────────────────────────────────────
