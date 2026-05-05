@@ -1,119 +1,84 @@
 import { useState, useEffect, useRef } from 'react';
 import './styles/global.css';
-import Topbar             from './components/Topbar';
-import Sidebar            from './components/Sidebar';
-import ParkingMap         from './components/ParkingMap';
-import ToastStack         from './components/ToastStack';
-import OnboardingOverlay  from './components/OnboardingOverlay';
+import Topbar            from './components/Topbar';
+import Sidebar           from './components/Sidebar';
+import ParkingCardGrid   from './components/ParkingCardGrid';
+import ToastStack        from './components/ToastStack';
+import OnboardingOverlay from './components/OnboardingOverlay';
 import {
-  TweaksPanel, TweakSection, TweakToggle,
-  TweakSlider, TweakColor,
+  TweaksPanel, TweakSection, TweakToggle, TweakColor,
 } from './components/TweaksPanel';
-import { useTweaks }      from './hooks/useTweaks';
+import { useTweaks }         from './hooks/useTweaks';
+import { useFirebaseSlots }  from './hooks/useFirebaseSlots';
 import {
-  loadSlots, canNotify, isGranted,
-  requestPerm, fireNotif, ONBOARDING_KEY,
+  canNotify, isGranted, requestPerm, fireNotif, ONBOARDING_KEY,
 } from './utils/parking';
 
-// ── Firebase ──────────────────────────────────────────────────────────────────
-const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
-
-// ── Tweak defaults ────────────────────────────────────────────────────────────
 const TWEAK_DEFAULTS = {
-  autoSimulate: true,
-  intervalSec:  3,
-  showCarIcon:  true,
-  accentColor:  '#F5A623',
+  showCarIcon: true,
+  accentColor: '#F5A623',
 };
 
-// ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [slots,      setSlots]      = useState(loadSlots);
-  const [selected,   setSelected]   = useState(null);
-  const [filter,     setFilter]     = useState('all');
-  const [notifPerm,  setNotifPerm]  = useState(
+  const { slots, fbStatus } = useFirebaseSlots();
+
+  const [selectedId,     setSelectedId]     = useState(null);
+  const [filter,         setFilter]         = useState('all');
+  const [notifPerm,      setNotifPerm]      = useState(
     canNotify() ? Notification.permission : 'unavailable'
   );
-  const [toasts,     setToasts]     = useState([]);
-  const [simRunning, setSimRunning] = useState(true);
+  const [toasts,         setToasts]         = useState([]);
   const [showOnboarding, setShowOnboarding] = useState(
     () => localStorage.getItem(ONBOARDING_KEY) !== '1'
   );
-  const toastId  = useRef(0);
-  const slotsRef = useRef(slots);
-  useEffect(() => { slotsRef.current = slots; }, [slots]);
 
-  // ── Persist slots ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const clean = slots.map((sl) => ({ ...sl, justChanged: false }));
-    localStorage.setItem('rizzpark_v2_slots', JSON.stringify(clean));
-  }, [slots]);
+  const toastId      = useRef(0);
+  const prevSlotsRef = useRef([]);
 
-  // ── Restore notif pref ─────────────────────────────────────────────────────
+  // Restore notification preference from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('rizzpark_notif');
     if (saved === 'granted' && isGranted()) setNotifPerm('granted');
   }, []);
 
-  // ── Reset justChanged after pulse animation ────────────────────────────────
+  // Detect occupied→vacant transitions and fire browser notifications + toasts
   useEffect(() => {
-    const any = slots.some((s) => s.justChanged);
-    if (!any) return;
-    const id = setTimeout(
-      () => setSlots((p) => p.map((s) => ({ ...s, justChanged: false }))),
-      500
-    );
-    return () => clearTimeout(id);
-  }, [slots]);
+    if (!prevSlotsRef.current.length) {
+      prevSlotsRef.current = slots;
+      return;
+    }
+    const prevById = Object.fromEntries(prevSlotsRef.current.map(s => [s.id, s]));
+    slots
+      .filter(s => prevById[s.id]?.status === 'occupied' && s.status === 'vacant')
+      .forEach(s => { fireNotif(s); spawnToast(s.id, s.row); });
+    prevSlotsRef.current = slots;
+  }, [slots]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Firebase polling (REST, exponential backoff) ───────────────────────────
-  useEffect(() => {
-    const BASE = 3000, MAX = 30_000;
-    let delay = BASE, failStreak = 0, timerId = null;
+  // Derived state
+  const selectedSlot = selectedId ? (slots.find(s => s.id === selectedId) ?? null) : null;
+  const accentStyle  = {
+    '--accent':      tweaks.accentColor,
+    '--accent-pale': tweaks.accentColor + '1A',
+  };
 
-    const poll = async () => {
-      try {
-        const r = await fetch(`${FIREBASE_URL}/parking.json`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
-        if (d?.slots) {
-          const freed = [];
-          const next = slotsRef.current.map((s) => {
-            const fb = d.slots[s.id];
-            if (!fb) return s;
-            const raw       = typeof fb === 'string' ? fb : (fb?.status ?? 'Vacant');
-            const newStatus = raw.toLowerCase() === 'occupied' ? 'occupied' : 'vacant';
-            if (newStatus === s.status) return s;
-            if (s.status === 'occupied' && newStatus === 'vacant') freed.push(s);
-            return { ...s, status: newStatus, updatedAt: Date.now(), justChanged: true };
-          });
-          setSlots(next);
-          freed.forEach((s) => { fireNotif(s); spawnToast(s.id, s.row); });
-        }
-        failStreak = 0;
-        delay = BASE;
-      } catch {
-        failStreak++;
-        delay = Math.min(BASE * Math.pow(2, failStreak - 1), MAX);
-      }
-      timerId = setTimeout(poll, delay);
-    };
+  // Status subtitle shown in the grid header
+  const statusLine =
+    fbStatus === 'online'   ? 'Live data · updates every ~3 s'  :
+    fbStatus === 'checking' ? 'Connecting to live feed…'         :
+                              'Disconnected — showing last known data';
 
-    poll();
-    return () => { if (timerId) clearTimeout(timerId); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
   function spawnToast(slotId, row) {
     const id = ++toastId.current;
-    setToasts((prev) => [...prev, { id, slotId, row, ts: Date.now(), out: false }]);
+    setToasts(prev => [...prev, { id, slotId, row, ts: Date.now(), out: false }]);
     setTimeout(() => dismissToast(id), 5000);
   }
 
   function dismissToast(id) {
-    setToasts((p) => p.map((t) => (t.id === id ? { ...t, out: true } : t)));
-    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 300);
+    setToasts(p => p.map(t => (t.id === id ? { ...t, out: true } : t)));
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 300);
   }
 
   async function handleNotif() {
@@ -124,37 +89,8 @@ export default function App() {
     localStorage.setItem('rizzpark_notif', perm);
   }
 
-  function handleSlotClick(slot) {
-    setSelected((prev) => (prev?.id === slot.id ? null : slot));
-  }
-
-  function toggleSlotStatus(slot) {
-    const wasOccupied = slot.status === 'occupied';
-    const newStatus   = wasOccupied ? 'vacant' : 'occupied';
-    if (wasOccupied) {
-      fireNotif(slot);
-      spawnToast(slot.id, slot.row);
-    }
-    setSlots((prev) =>
-      prev.map((s) =>
-        s.id === slot.id
-          ? { ...s, status: newStatus, updatedAt: Date.now(), justChanged: true }
-          : s
-      )
-    );
-    setSelected((prev) =>
-      prev?.id === slot.id ? { ...prev, status: newStatus } : prev
-    );
-  }
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-  const selectedSlot = selected ? slots.find((s) => s.id === selected.id) : null;
-  const accentStyle  = {
-    '--accent':      tweaks.accentColor,
-    '--accent-pale': tweaks.accentColor + '1A',
-  };
-
   // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="app" style={accentStyle}>
       {showOnboarding && (
@@ -169,46 +105,42 @@ export default function App() {
           filter={filter}
           selectedSlot={selectedSlot}
           onFilterChange={setFilter}
-          onToggleStatus={toggleSlotStatus}
-          onDeselect={() => setSelected(null)}
+          onToggleStatus={() => {}}
+          onDeselect={() => setSelectedId(null)}
         />
 
-        <ParkingMap
-          slots={slots}
-          filter={filter}
-          selectedSlot={selectedSlot}
-          showCarIcon={tweaks.showCarIcon}
-          simRunning={simRunning}
-          onSlotClick={handleSlotClick}
-          onToggleSim={() => setSimRunning((r) => !r)}
-        />
+        <div className="grid-area">
+          <div className="grid-topbar">
+            <div>
+              <div className="grid-title">Ground Floor — Parking Map</div>
+              <div className="grid-subtitle">{statusLine}</div>
+            </div>
+          </div>
+
+          <ParkingCardGrid
+            slots={slots}
+            selected={selectedId}
+            onSelect={setSelectedId}
+            filter={filter}
+            theme="driver"
+            showCarIcon={tweaks.showCarIcon}
+          />
+        </div>
       </div>
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
       <TweaksPanel>
-        <TweakSection label="Simulation" />
-        <TweakToggle
-          label="Auto-simulate"
-          value={tweaks.autoSimulate}
-          onChange={(v) => setTweak('autoSimulate', v)}
-        />
-        <TweakSlider
-          label="Interval"
-          value={tweaks.intervalSec}
-          min={1} max={15} step={1} unit="s"
-          onChange={(v) => setTweak('intervalSec', v)}
-        />
         <TweakSection label="Display" />
         <TweakToggle
           label="Show car icons"
           value={tweaks.showCarIcon}
-          onChange={(v) => setTweak('showCarIcon', v)}
+          onChange={v => setTweak('showCarIcon', v)}
         />
         <TweakColor
           label="Accent color"
           value={tweaks.accentColor}
-          onChange={(v) => setTweak('accentColor', v)}
+          onChange={v => setTweak('accentColor', v)}
         />
       </TweaksPanel>
     </div>

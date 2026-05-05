@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { normalizeAdminSlotsObject } from "../utils/slotModel";
+import { deleteSlot } from "../utils/firebase";
+import ParkingCardGrid from "../components/ParkingCardGrid";
+import { getApiUrl, getMode, setMode, getFirebaseParkingPath } from "../config/modeConfig";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIG — update these two values for your setup
 // NOTE #9: Move RTSP credentials to a server-side .env — never expose in frontend.
 // ─────────────────────────────────────────────────────────────────────────────
-const PI_API_URL   = "http://192.168.1.104:5000";
+let PI_API_URL = getApiUrl(); // mutable — updated by switchMode() on mode changes
 const FIREBASE_URL = "https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app";
 // Camera resolution — must match your RTSP camera output
 const CAM_W = 2560;
@@ -156,7 +160,6 @@ function ParkingMap({slots,selectedSlot,onSelect,adminMode,onRemove}){
 
           return(
             <g key={id} onClick={()=>onSelect(sel?null:id)} style={{cursor:"pointer"}}>
-              {/* Fix #6: use polygon for quad coords, rect for legacy */}
               {quadPoints ? (
                 <polygon points={quadPoints}
                   fill={sel?(occ?`${C.occ}50`:`${C.vac}45`):(occ?`${C.occ}28`:`${C.vac}20`)}
@@ -189,15 +192,49 @@ function ParkingMap({slots,selectedSlot,onSelect,adminMode,onRemove}){
 }
 
 // ── Live Feed Panel ───────────────────────────────────────────────────────────
-function LiveFeedPanel({piStatus}){
-  const [active, setActive]   = useState(true);
-  const [loaded, setLoaded]   = useState(false);
-  const [error,  setError]    = useState(false);
-  const [fps,    setFps]      = useState(0);
-  const imgRef                = useRef(null);
-  const lastTime              = useRef(Date.now());
-  const piOffline             = piStatus === "error";
-  const streamUrl             = `${PI_API_URL}/stream`;
+function LiveFeedPanel({piStatus, mode}){
+  const [active,      setActive]      = useState(true);
+  const [loaded,      setLoaded]      = useState(false);
+  const [error,       setError]       = useState(false);
+  const [fps,         setFps]         = useState(0);
+  const [videoSource, setVideoSource] = useState("camera"); // "camera" | "video"
+  const [videoFile,   setVideoFile]   = useState(null);
+  const [playState,   setPlayState]   = useState("stopped"); // "stopped"|"playing"|"paused"
+  const [progress,    setProgress]    = useState(null);
+  const imgRef                        = useRef(null);
+  const lastTime                      = useRef(Date.now());
+  const piOffline                     = piStatus === "error";
+  const isDesktop                     = mode === "desktop";
+  const streamUrl                     = `${PI_API_URL}/stream`;
+
+  // Poll /video/status while video is playing
+  useEffect(() => {
+    if (playState !== "playing") return;
+    const iv = setInterval(async () => {
+      try {
+        const r = await fetch(`${PI_API_URL}/video/status`);
+        const d = await r.json();
+        setProgress(d);
+        if (d.state === "stopped") setPlayState("stopped");
+      } catch { /* silent — non-critical */ }
+    }, 2000);
+    return () => clearInterval(iv);
+  }, [playState]);
+
+  const videoCall = async (endpoint, body = null) => {
+    try {
+      await fetch(`${PI_API_URL}${endpoint}`, { method: "POST", ...(body ? { body } : {}) });
+    } catch { /* server errors shown by piOffline state */ }
+  };
+
+  const handleVideoLoad = async () => {
+    if (!videoFile) return;
+    const fd = new FormData();
+    fd.append("video", videoFile);
+    await videoCall("/video/load", fd);
+    setPlayState("stopped");
+    setProgress(null);
+  };
 
   const onFrameLoad = () => {
     const now     = Date.now();
@@ -227,6 +264,83 @@ function LiveFeedPanel({piStatus}){
 
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
+
+      {/* ── Source selector (Desktop mode only) ─────────────────────── */}
+      {isDesktop && (
+        <div style={{display:"flex",gap:6}}>
+          {[["camera","📹 Camera"],["video","🎬 Video File"]].map(([src,label])=>(
+            <button key={src} onClick={()=>setVideoSource(src)}
+              style={{padding:"5px 14px",borderRadius:8,
+                border:`1px solid ${videoSource===src?C.accent+"55":"rgba(255,255,255,.1)"}`,
+                background:videoSource===src?`${C.accent}15`:"transparent",
+                color:videoSource===src?C.accent:C.muted,
+                fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all .15s"}}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Video file controls (Desktop + Video source only) ────────── */}
+      {isDesktop && videoSource==="video" && (
+        <div style={{display:"flex",flexDirection:"column",gap:10,padding:"12px 14px",
+          borderRadius:10,background:"rgba(56,189,248,.06)",border:`1px solid rgba(56,189,248,.2)`}}>
+          {/* File picker */}
+          <label style={{cursor:"pointer",fontFamily:C.mono,fontSize:11,color:C.muted,
+            padding:"8px 12px",borderRadius:8,border:`1px dashed rgba(56,189,248,.35)`,
+            background:"rgba(56,189,248,.04)",textAlign:"center"}}>
+            {videoFile ? videoFile.name : "📂 Click to select video (.mp4 .avi .mov)"}
+            <input type="file" accept="video/*" style={{display:"none"}}
+              onChange={e => { setVideoFile(e.target.files[0]); setPlayState("stopped"); setProgress(null); }}/>
+          </label>
+          {/* Controls */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <button onClick={handleVideoLoad} disabled={!videoFile||piOffline}
+              style={{padding:"6px 14px",borderRadius:8,
+                border:`1px solid ${C.accent}55`,background:`${C.accent}15`,color:C.accent,
+                fontFamily:C.mono,fontSize:10,fontWeight:700,
+                cursor:(!videoFile||piOffline)?"not-allowed":"pointer"}}>
+              ⬆ Load
+            </button>
+            {playState!=="playing"
+              ? <button onClick={async()=>{await videoCall("/video/start");setPlayState("playing");}}
+                  disabled={piOffline}
+                  style={{padding:"6px 14px",borderRadius:8,
+                    border:`1px solid ${C.vac}55`,background:`${C.vac}15`,color:C.vac,
+                    fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:piOffline?"not-allowed":"pointer"}}>
+                  ▶ {playState==="paused"?"Resume":"Start"}
+                </button>
+              : <button onClick={async()=>{await videoCall("/video/pause");setPlayState("paused");}}
+                  style={{padding:"6px 14px",borderRadius:8,
+                    border:`1px solid ${C.warn}55`,background:`${C.warn}15`,color:C.warn,
+                    fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                  ⏸ Pause
+                </button>
+            }
+            <button onClick={async()=>{await videoCall("/video/stop");setPlayState("stopped");setProgress(null);}}
+              disabled={playState==="stopped"}
+              style={{padding:"6px 14px",borderRadius:8,
+                border:`1px solid ${C.occ}55`,background:`${C.occ}15`,color:C.occ,
+                fontFamily:C.mono,fontSize:10,fontWeight:700,
+                cursor:playState==="stopped"?"not-allowed":"pointer"}}>
+              ⏹ Stop
+            </button>
+          </div>
+          {/* Progress bar */}
+          {progress && progress.total > 0 && (
+            <div style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>
+              <div style={{marginBottom:4}}>
+                Frame {progress.frame} / {progress.total} · {Math.round(progress.frame/progress.total*100)}% · {progress.fps} FPS
+              </div>
+              <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.08)"}}>
+                <div style={{height:"100%",borderRadius:2,background:C.vac,
+                  width:`${Math.round(progress.frame/progress.total*100)}%`,transition:"width .5s"}}/>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
         <div style={{padding:"10px 16px",background:`linear-gradient(135deg,rgba(56,189,248,.1),rgba(99,102,241,.06))`,border:`1px solid rgba(56,189,248,.25)`,borderRadius:12,display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:20}}>📹</span>
@@ -1434,13 +1548,14 @@ function DistortionPanel({piStatus, addLog}){
 }
 
 // ── Admin Panel ───────────────────────────────────────────────────────────────
-function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piStatus,firebaseStatus}){
+function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piStatus,firebaseStatus,mode}){
   const [selected,setSelected]   = useState(null);
   const [confirm,setConfirm]     = useState(null);
   const [section,setSection]     = useState("map");
   const [remapping,setRemapping] = useState(false);
   const [remapMsg,setRemapMsg]   = useState(null);
   const [layoutMode,setLayoutMode] = useState("auto");   // horizontal | vertical | grid | auto
+  const [mapView,setMapView]     = useState("vector");   // "vector" | "card"
   const total    = Object.keys(slots).length;
   const occupied = Object.values(slots).filter(s=>s.status==="Occupied").length;
   const vacant   = total-occupied;
@@ -1524,6 +1639,18 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
               {firebaseStatus==="online"
                 ?<><LiveDot/><span style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>Live from Firebase</span></>
                 :<span style={{fontFamily:C.mono,fontSize:10,color:C.warn}}>⚠ No live data</span>}
+
+              {/* View toggle: vector ↔ card */}
+              <div style={{display:"flex",gap:2,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`}}>
+                {[["vector","◈ Vector"],["card","⊞ Cards"]].map(([mode,label])=>(
+                  <button key={mode} onClick={()=>setMapView(mode)}
+                    title={mode==="vector"?"Show detection polygons on camera frame":"Show uniform slot cards grouped by row"}
+                    style={{padding:"5px 12px",borderRadius:6,border:"none",cursor:"pointer",fontFamily:C.mono,fontWeight:700,fontSize:10,letterSpacing:".03em",background:mapView===mode?`${C.accent}22`:"transparent",color:mapView===mode?C.accent:C.muted,transition:"all .15s"}}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               <div style={{display:"flex",gap:2,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`}}
                 title="Layout mode used on next remap">
                 {LAYOUT_MODES.map(m=>(
@@ -1549,7 +1676,15 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
               {remapMsg.ok?"✅":"⚠️"} {remapMsg.text}
             </div>
           )}
-          <ParkingMap slots={slots} selectedSlot={selected} onSelect={setSelected} adminMode={true} onRemove={id=>setConfirm(id)}/>
+          {mapView==="vector"
+            ? <ParkingMap slots={slots} selectedSlot={selected} onSelect={setSelected} adminMode={true} onRemove={id=>setConfirm(id)}/>
+            : <ParkingCardGrid
+                slots={normalizeAdminSlotsObject(slots)}
+                selected={selected}
+                onSelect={setSelected}
+                theme="admin"
+              />
+          }
           <SlotDetail slotId={selected} slot={selected?slots[selected]:null} onClose={()=>setSelected(null)} onRemove={id=>setConfirm(id)} adminMode={true}/>
           {total>0&&(
             <div style={{marginTop:20,paddingTop:20,borderTop:`1px solid ${C.border}`}}>
@@ -1577,7 +1712,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
 
       {section==="feed"&&(
         <Card style={{padding:20}}>
-          <LiveFeedPanel piStatus={piStatus}/>
+          <LiveFeedPanel piStatus={piStatus} mode={mode}/>
         </Card>
       )}
 
@@ -1808,7 +1943,14 @@ export default function AdminApp(){
   const [piStatus,setPiStatus]       = useState("checking");
   const [fbStatus,setFbStatus]       = useState("checking");
   const [lastUpdated,setLastUpdated] = useState(null);
+  const [mode, setModeState]         = useState(getMode);
   const logId = useRef(0);
+
+  const switchMode = useCallback((newMode) => {
+    PI_API_URL = setMode(newMode);  // update module-level var + localStorage
+    setModeState(newMode);          // trigger full re-render
+    setPiStatus("checking");        // amber dot immediately
+  }, []);
 
   const addLog = useCallback((msg,type="info")=>{
     setLogs(p=>[...p.slice(-150),{id:logId.current++,msg,type,time:fmtTs()}]);
@@ -1829,8 +1971,8 @@ export default function AdminApp(){
     checkPi();
     const iv = setInterval(checkPi,15000);
     return ()=>clearInterval(iv);
-  // Fix #6: addLog is stable via useCallback — include to satisfy exhaustive-deps
-  },[addLog]);
+  // mode in deps so checkPi re-fires immediately against the new URL on mode switch
+  },[addLog, mode]);
 
   // Fix #8: removed the dead slot_layout merge from inside the /parking poll.
   // slot_layout is loaded once on mount from /slot_layout.json (its actual path).
@@ -1852,7 +1994,7 @@ export default function AdminApp(){
 
     const poll = async () => {
       try {
-        const r = await fetch(`${FIREBASE_URL}/parking.json`);
+        const r = await fetch(`${FIREBASE_URL}/${getFirebaseParkingPath()}.json`);
         if(!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
         if(d?.slots){
@@ -1893,8 +2035,8 @@ export default function AdminApp(){
 
     poll();
     return ()=>{ if(timerId) clearTimeout(timerId); };
-  // Fix #6: addLog is stable (useCallback) — include it to satisfy exhaustive-deps
-  },[addLog]);
+  // mode in deps so the poll restarts with the new Firebase path on mode switch
+  },[addLog, mode]);
 
   // Fix #5: slot_layout is the authoritative source of coords.
   // Poll it every 10s so the map updates automatically after a Remap
@@ -1906,7 +2048,7 @@ export default function AdminApp(){
 
     const loadLayout = async () => {
       try {
-        const r = await fetch(`${FIREBASE_URL}/slot_layout.json`);
+        const r = await fetch(`${FIREBASE_URL}/${getFirebaseParkingPath()}_layout.json`);
         if(!r.ok) return;
         const layout = await r.json();
         if(!layout || typeof layout !== "object") return;
@@ -1936,13 +2078,30 @@ export default function AdminApp(){
     loadLayout();
     const iv = setInterval(loadLayout, 10000);   // refresh every 10s to catch Remaps
     return ()=>clearInterval(iv);
-  // Fix #6: addLog included to satisfy exhaustive-deps
-  },[addLog]);
+  // mode in deps so layout path updates when mode switches
+  },[addLog, mode]);
 
-  const handleRemove = useCallback((id)=>{
+  const handleRemove = useCallback(async (id)=>{
+    // Optimistically remove from UI so the action feels instant.
     setSlots(p=>{const n={...p};delete n[id];return n;});
     setRemoved(p=>[...p,{id,time:fmtTs()}]);
-    addLog(`[ADMIN] Slot ${id} manually removed`,"sys");
+    addLog(`[ADMIN] Slot ${id} removing from Firebase…`,"sys");
+    try {
+      await deleteSlot(id);
+      addLog(`[ADMIN] Slot ${id} deleted from Firebase`,"sys");
+    } catch(err) {
+      // Rollback: restore the slot and remove it from the removed list.
+      addLog(`[ADMIN] Failed to delete ${id} from Firebase: ${err.message}`,"err");
+      setRemoved(p=>p.filter(s=>!(s.id===id)));
+      // Re-fetch from Firebase to restore accurate state.
+      try {
+        const r = await fetch(`${FIREBASE_URL}/parking/slots/${id}.json`);
+        if(r.ok){
+          const val = await r.json();
+          if(val) setSlots(p=>({...p,[id]:val}));
+        }
+      } catch { /* silent — next poll will restore */ }
+    }
   },[addLog]);
 
   const handleImageAnalysis = useCallback((result)=>{
@@ -1976,7 +2135,17 @@ export default function AdminApp(){
             <button key={t.id} onClick={()=>setTab(t.id)}
               style={{padding:"0 16px",height:58,border:"none",cursor:"pointer",fontFamily:C.sans,fontWeight:700,fontSize:13,background:"transparent",color:tab===t.id?t.id==="admin"?C.occ:C.accent:C.muted,borderBottom:tab===t.id?`2px solid ${t.id==="admin"?C.occ:C.accent}`:"2px solid transparent",transition:"all .2s"}}>{t.label}</button>
           ))}
-          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
+            <button
+              onClick={() => switchMode(mode === "pi" ? "desktop" : "pi")}
+              title={`${mode === "pi" ? "Pi" : "Desktop"} Mode — API: ${PI_API_URL}. Click to switch.`}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:8,
+                border:`1px solid ${mode==="pi"?"rgba(167,139,250,.4)":"rgba(56,189,248,.4)"}`,
+                background:mode==="pi"?"rgba(167,139,250,.12)":"rgba(56,189,248,.12)",
+                color:mode==="pi"?C.purple:C.accent,
+                fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+              {mode === "pi" ? "🔌 Pi" : "💻 Desktop"}
+            </button>
             <LiveDot color={piStatus==="online"?C.vac:piStatus==="error"?C.occ:C.warn}/>
             <span style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>
               {lastUpdated?`Updated ${fmtTs()}`:"No data yet"}
@@ -1987,7 +2156,7 @@ export default function AdminApp(){
       <div style={{maxWidth:960,margin:"0 auto",padding:"24px 16px"}}>
         {tab==="user"
           ?<UserView slots={slots} firebaseStatus={fbStatus}/>
-          :<AdminPanel slots={slots} logs={logs} onRemove={handleRemove} removedSlots={removed} addLog={addLog} onImageAnalysis={handleImageAnalysis} piStatus={piStatus} firebaseStatus={fbStatus}/>}
+          :<AdminPanel slots={slots} logs={logs} onRemove={handleRemove} removedSlots={removed} addLog={addLog} onImageAnalysis={handleImageAnalysis} piStatus={piStatus} firebaseStatus={fbStatus} mode={mode}/>}
       </div>
     </div>
   );

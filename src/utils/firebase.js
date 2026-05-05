@@ -7,7 +7,7 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
+import { getDatabase, ref, remove } from 'firebase/database';
 
 const firebaseConfig = {
   // Only databaseURL is strictly needed for Realtime Database reads.
@@ -17,3 +17,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
+
+// Permanently removes a slot from Firebase at /parking/slots/{id}.
+// Throws on network or permission errors — callers should handle.
+export async function deleteSlot(id) {
+  await remove(ref(db, `parking/slots/${id}`));
+}
