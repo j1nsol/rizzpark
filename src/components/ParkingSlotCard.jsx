@@ -27,19 +27,6 @@ function CarIconSVG({ color }) {
   );
 }
 
-function PIconSVG({ color }) {
-  return (
-    <svg viewBox="0 0 40 26" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style={{ width: 32, height: 22, display: 'block' }}>
-      <rect x="2" y="2" width="36" height="22" rx="5"
-        stroke={color} strokeWidth="1.5" strokeDasharray="4 3" fill="none" opacity="0.5" />
-      <text x="50%" y="17" textAnchor="middle"
-        fontFamily="DM Serif Display, serif" fontSize="14"
-        fill={color} opacity="0.7" fontWeight="bold">P</text>
-    </svg>
-  );
-}
-
 export default function ParkingSlotCard({ slot, isSelected, onClick, theme = 'driver', showCarIcon = true }) {
   const occ = slot.status === 'occupied';
 
@@ -72,7 +59,8 @@ export default function ParkingSlotCard({ slot, isSelected, onClick, theme = 'dr
           width: 6, height: 6, borderRadius: '50%',
           background: activeColor, boxShadow: `0 0 5px ${activeColor}`,
         }} />
-        <div style={{ fontSize: 22, lineHeight: 1 }}>{occ ? '🚗' : '🅿️'}</div>
+        {/* Car icon for both states — red when occupied, green when vacant */}
+        <CarIconSVG color={activeColor} />
         <div style={{
           fontFamily: ADMIN_C.mono, fontSize: 10, fontWeight: 700,
           color: occ ? '#fda4af' : '#6ee7b7',
@@ -87,18 +75,17 @@ export default function ParkingSlotCard({ slot, isSelected, onClick, theme = 'dr
   const classes = [
     'slot-card',
     slot.status,
-    isSelected     ? 'selected'      : '',
-    slot.justChanged ? 'just-changed' : '',
+    isSelected       ? 'selected'      : '',
+    slot.justChanged ? 'just-changed'  : '',
   ].filter(Boolean).join(' ');
 
   return (
     <div className={classes} onClick={onClick} title={`Slot ${slot.id} — ${slot.status}`}>
       <div className="slot-status-dot" />
 
-      {showCarIcon && occ ? (
-        <CarIconSVG color="var(--occupied)" />
-      ) : showCarIcon ? (
-        <PIconSVG color="var(--vacant)" />
+      {showCarIcon ? (
+        // Car icon for both states — uses occupied/vacant CSS variable colour
+        <CarIconSVG color={`var(--${slot.status})`} />
       ) : (
         <div style={{
           width: 32, height: 22, display: 'flex',

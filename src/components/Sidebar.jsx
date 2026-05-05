@@ -47,8 +47,8 @@ export default function Sidebar({
       <div>
         <div className="sidebar-section-title">Overview</div>
         <div className="stat-grid">
-          <div className="stat-box full">
-            <div className="s-label">Available Now</div>
+          <div className="stat-box available">
+            <div className="s-label">Available</div>
             <div className="s-val">{vacant}</div>
             <div className="s-sub">{total} total slots</div>
             <div className="occ-bar">
@@ -63,14 +63,14 @@ export default function Sidebar({
           </div>
 
           <div className="stat-box full">
-  <div className="s-label">Occupancy</div>
-  <div className="s-val">
-    {occPct}<span style={{ fontSize: '15px', fontWeight: 400 }}>%</span>
-  </div>
-  <div className="occ-bar">
-    <div className="occ-fill" style={{ width: `${occPct}%` }} />
-  </div>
-</div>
+            <div className="s-label">Occupancy</div>
+            <div className="s-val">
+              {occPct}<span style={{ fontSize: '15px', fontWeight: 400 }}>%</span>
+            </div>
+            <div className="occ-bar">
+              <div className="occ-fill" style={{ width: `${occPct}%` }} />
+            </div>
+          </div>
         </div>
       </div>
 
