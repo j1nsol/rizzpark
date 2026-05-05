@@ -13,6 +13,7 @@ import { useFirebaseSlots }  from './hooks/useFirebaseSlots';
 import {
   canNotify, isGranted, requestPerm, fireNotif, ONBOARDING_KEY,
 } from './utils/parking';
+import { setSlotOverride } from './utils/firebase';
 
 const TWEAK_DEFAULTS = {
   showCarIcon: true,
@@ -21,7 +22,7 @@ const TWEAK_DEFAULTS = {
 
 export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { slots, fbStatus } = useFirebaseSlots();
+  const { slots, fbStatus, showSelectedBox } = useFirebaseSlots();
 
   const [selectedId,     setSelectedId]     = useState(null);
   const [filter,         setFilter]         = useState('all');
@@ -81,6 +82,15 @@ export default function App() {
     setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 300);
   }
 
+  async function handleToggleStatus(slot) {
+    const newStatus = slot.status === 'occupied' ? 'Vacant' : 'Occupied';
+    try {
+      await setSlotOverride(slot.id, newStatus);
+    } catch (e) {
+      console.error('Failed to override slot status:', e);
+    }
+  }
+
   async function handleNotif() {
     if (notifPerm === 'granted') return;
     const ok   = await requestPerm();
@@ -105,8 +115,9 @@ export default function App() {
           filter={filter}
           selectedSlot={selectedSlot}
           onFilterChange={setFilter}
-          onToggleStatus={() => {}}
+          onToggleStatus={handleToggleStatus}
           onDeselect={() => setSelectedId(null)}
+          showSelectedBox={showSelectedBox}
         />
 
         <div className="grid-area">

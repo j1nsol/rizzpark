@@ -4,7 +4,10 @@
       "Bash(npm install *)",
       "Bash(npx vite *)",
       "Bash(node_modules/.bin/vite build *)",
-      "Bash(npx react-scripts *)"
+      "Bash(npx react-scripts *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\JX\\\\Desktop\\\\parking web\\\\smart-parking\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)"
     ]
   }
 }

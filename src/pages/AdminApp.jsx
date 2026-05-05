@@ -1547,6 +1547,83 @@ function DistortionPanel({piStatus, addLog}){
   );
 }
 
+// ── Driver UI Settings Panel ──────────────────────────────────────────────────
+// Reads and writes /settings/showSelectedBox in Firebase via REST so the Driver
+// Interface can conditionally render the Selected Box card without a page reload.
+function DriverUISettingsPanel(){
+  const [showSelectedBox, setShowSelectedBox] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [msg,    setMsg]      = useState(null);
+
+  useEffect(()=>{
+    fetch(`${FIREBASE_URL}/settings.json`,{signal:AbortSignal.timeout(4000)})
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{ if(d && typeof d.showSelectedBox==="boolean") setShowSelectedBox(d.showSelectedBox); })
+      .catch(()=>{});
+  },[]);
+
+  const showMsg = (text,ok=true)=>{ setMsg({text,ok}); setTimeout(()=>setMsg(null),4000); };
+
+  const save = async (val)=>{
+    if(saving) return;
+    setSaving(true);
+    setShowSelectedBox(val);
+    try{
+      const r = await fetch(`${FIREBASE_URL}/settings.json`,{
+        method:"PATCH",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({showSelectedBox:val}),
+        signal:AbortSignal.timeout(5000),
+      });
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      showMsg(`Selected Box card ${val?"shown":"hidden"} in Driver UI.`);
+    }catch(e){
+      showMsg(`Save failed: ${e.message}`,false);
+      setShowSelectedBox(!val); // revert
+    }finally{ setSaving(false); }
+  };
+
+  return(
+    <Card style={{padding:"4px 20px 20px",marginTop:4}}>
+      <div style={{fontFamily:C.sans,fontWeight:700,fontSize:13,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginTop:18,marginBottom:14}}>
+        Driver UI Settings
+      </div>
+      {msg&&(
+        <div style={{marginBottom:12,padding:"10px 14px",borderRadius:10,background:msg.ok?`${C.vac}12`:`${C.occ}12`,border:`1px solid ${msg.ok?C.vac+"33":C.occ+"33"}`,fontFamily:C.mono,fontSize:11,color:msg.ok?C.vac:C.occ,animation:"fadeUp .2s ease"}}>
+          {msg.ok?"✅":"⚠️"} {msg.text}
+        </div>
+      )}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0",borderBottom:`1px solid ${C.border}`}}>
+        <div style={{flex:1,paddingRight:20}}>
+          <div style={{fontFamily:C.mono,fontSize:12,color:C.text,fontWeight:600}}>Show Selected Box Card</div>
+          <div style={{fontFamily:C.mono,fontSize:10,color:C.muted,marginTop:3,lineHeight:1.5}}>
+            When ON, drivers can click a parking slot to view details and manually override its status.
+            Toggle OFF to hide the card entirely from the Driver Interface.
+          </div>
+        </div>
+        <div onClick={()=>!saving&&save(!showSelectedBox)}
+          style={{display:"flex",alignItems:"center",gap:8,cursor:saving?"not-allowed":"pointer",flexShrink:0}}>
+          <span style={{fontFamily:C.mono,fontSize:11,color:showSelectedBox?C.vac:C.muted}}>
+            {showSelectedBox?"Visible":"Hidden"}
+          </span>
+          <div style={{width:42,height:24,borderRadius:12,
+            background:showSelectedBox?C.vac:"rgba(255,255,255,.1)",
+            border:`1px solid ${showSelectedBox?C.vac+"66":C.border}`,
+            position:"relative",transition:"all .25s",opacity:saving?.6:1}}>
+            {saving
+              ? <div style={{position:"absolute",top:4,left:13,width:16,height:16,border:`2px solid rgba(255,255,255,.3)`,borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+              : <div style={{position:"absolute",top:3,left:showSelectedBox?20:3,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left .25s",boxShadow:"0 1px 4px rgba(0,0,0,.4)"}}/>
+            }
+          </div>
+        </div>
+      </div>
+      <div style={{marginTop:14,padding:"10px 14px",borderRadius:10,background:"rgba(56,189,248,.06)",border:`1px solid rgba(56,189,248,.15)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
+        ℹ️ The toggle syncs instantly to Firebase. The Driver Interface picks up the change within 5 seconds without a reload.
+      </div>
+    </Card>
+  );
+}
+
 // ── Admin Panel ───────────────────────────────────────────────────────────────
 function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piStatus,firebaseStatus,mode}){
   const [selected,setSelected]   = useState(null);
@@ -1721,13 +1798,16 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
       )}
 
       {section==="program"&&(
-        <Card style={{padding:20}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-            <span style={{fontFamily:C.sans,fontWeight:700,fontSize:15}}>Program Properties</span>
-            <span style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>— hot-reloaded, no restart needed</span>
-          </div>
-          <ProgramPropertiesPanel piStatus={piStatus} addLog={addLog}/>
-        </Card>
+        <div style={{display:"flex",flexDirection:"column",gap:18}}>
+          <Card style={{padding:20}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+              <span style={{fontFamily:C.sans,fontWeight:700,fontSize:15}}>Program Properties</span>
+              <span style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>— hot-reloaded, no restart needed</span>
+            </div>
+            <ProgramPropertiesPanel piStatus={piStatus} addLog={addLog}/>
+          </Card>
+          <DriverUISettingsPanel/>
+        </div>
       )}
 
       {section==="distortion"&&(

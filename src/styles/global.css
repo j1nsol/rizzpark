@@ -140,7 +140,13 @@ body::before {
   background: var(--bg); transition: all .2s;
 }
 .slot-detail.empty { color: var(--text-3); font-size: 13px; text-align: center; padding: 24px 16px; }
-.sd-id { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 4px; }
+.sd-id { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.sd-override-badge {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 4px;
+  background: var(--accent-pale); color: var(--accent); border: 1px solid var(--accent);
+}
+.sd-btn-reset { color: var(--text-2); font-size: 12px; }
 .sd-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); padding: 5px 0; border-bottom: 1px solid var(--border); }
 .sd-row:last-of-type { border: none; }
 .sd-row b { color: var(--text); font-weight: 500; }

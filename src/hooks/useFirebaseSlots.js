@@ -8,13 +8,15 @@ const MAX_DELAY    = 30000;
 // Shared Firebase polling hook consumed by both AdminApp and the Driver Interface.
 // Returns NormalizedSlot[] (see slotModel.js) with real-time status from Firebase.
 //
-//   slots      : NormalizedSlot[]  — current parking state
-//   fbStatus   : 'checking' | 'online' | 'error'
-//   lastUpdated: number | null     — Unix ms of last successful poll
+//   slots           : NormalizedSlot[]  — current parking state (override applied)
+//   fbStatus        : 'checking' | 'online' | 'error'
+//   lastUpdated     : number | null     — Unix ms of last successful poll
+//   showSelectedBox : boolean           — admin-controlled visibility of the Selected Box card
 export function useFirebaseSlots() {
-  const [slots,       setSlots]       = useState([]);
-  const [fbStatus,    setFbStatus]    = useState('checking');
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [slots,              setSlots]              = useState([]);
+  const [fbStatus,           setFbStatus]           = useState('checking');
+  const [lastUpdated,        setLastUpdated]        = useState(null);
+  const [showSelectedBox,    setShowSelectedBox]    = useState(true);
   const layoutRef = useRef({});
 
   // Fetch slot_layout (coords, row assignments) every 10 s — non-critical,
@@ -36,7 +38,29 @@ export function useFirebaseSlots() {
     return () => clearInterval(iv);
   }, []);
 
+  // Poll /settings.json every 5 s to pick up admin-controlled UI flags.
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const r = await fetch(`${FIREBASE_URL}/settings.json`);
+        if (!r.ok) return;
+        const settings = await r.json();
+        if (settings && typeof settings.showSelectedBox === 'boolean') {
+          setShowSelectedBox(settings.showSelectedBox);
+        }
+      } catch {
+        // intentionally silent
+      }
+    };
+
+    loadSettings();
+    const iv = setInterval(loadSettings, 5_000);
+    return () => clearInterval(iv);
+  }, []);
+
   // Poll /parking.json for occupancy with exponential back-off on failure.
+  // Applies manual override: if isOverridden is true, manualStatus takes precedence
+  // over the detection result so admin-enforced status survives sensor updates.
   useEffect(() => {
     let delay      = BASE_DELAY;
     let failStreak = 0;
@@ -53,22 +77,34 @@ export function useFirebaseSlots() {
           Object.entries(d.slots).forEach(([id, val]) => {
             const layout = layoutRef.current[id] ?? {};
             merged[id] = {
-              status:     typeof val === 'string' ? val : (val?.status ?? 'Vacant'),
-              coords:     val?.coords     ?? layout.coords     ?? null,
-              row:        val?.row        ?? layout.row        ?? null,
-              confidence: val?.confidence ?? layout.confidence ?? 0.8,
+              status:       typeof val === 'string' ? val : (val?.status ?? 'Vacant'),
+              manualStatus: val?.manualStatus ?? null,
+              isOverridden: val?.isOverridden === true,
+              coords:       val?.coords     ?? layout.coords     ?? null,
+              row:          val?.row        ?? layout.row        ?? null,
+              confidence:   val?.confidence ?? layout.confidence ?? 0.8,
             };
           });
 
           setSlots(prev => {
             const prevById = Object.fromEntries(prev.map(s => [s.id, s]));
             return normalizeAdminSlotsObject(merged).map(s => {
-              const prevSlot     = prevById[s.id];
-              const statusChanged = prev.length > 0 && prevSlot?.status !== s.status;
+              const raw = merged[s.id];
+              // Manual override wins over detection result when isOverridden is set.
+              const effectiveStatus =
+                raw?.isOverridden && raw?.manualStatus
+                  ? raw.manualStatus.toLowerCase()
+                  : s.status;
+
+              const prevSlot      = prevById[s.id];
+              const statusChanged = prev.length > 0 && prevSlot?.status !== effectiveStatus;
               return {
                 ...s,
-                updatedAt:   statusChanged ? Date.now() : (prevSlot?.updatedAt ?? Date.now()),
-                justChanged: statusChanged,
+                status:       effectiveStatus,
+                isOverridden: raw?.isOverridden ?? false,
+                manualStatus: raw?.manualStatus ?? null,
+                updatedAt:    statusChanged ? Date.now() : (prevSlot?.updatedAt ?? Date.now()),
+                justChanged:  statusChanged,
               };
             });
           });
@@ -101,5 +137,5 @@ export function useFirebaseSlots() {
     return () => clearTimeout(id);
   }, [slots]);
 
-  return { slots, fbStatus, lastUpdated };
+  return { slots, fbStatus, lastUpdated, showSelectedBox };
 }
