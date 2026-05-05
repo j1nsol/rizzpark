@@ -17,13 +17,13 @@ const urlsToCache = [
 
 // Firebase configuration (same as in firebase.js)
 const firebaseConfig = {
-  apiKey: "your-api-key",
+  apiKey: "AIzaSyAQdadrOY92XZKyEWHDkwglxT7taiGWJhE",
   authDomain: "automapping-parking-slot.firebaseapp.com",
   databaseURL: "https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "automapping-parking-slot",
-  storageBucket: "automapping-parking-slot.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id"
+  storageBucket: "automapping-parking-slot.firebasestorage.app",
+  messagingSenderId: "743840389881",
+  appId: "1:743840389881:web:9d395e61f3299511752028"
 };
 
 // Initialize Firebase in service worker
