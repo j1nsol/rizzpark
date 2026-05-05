@@ -3,13 +3,14 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compa
 
 // Initialize Firebase in the service worker
 firebase.initializeApp({
-  apiKey: "your-api-key",
+  apiKey: "AIzaSyAQdadrOY92XZKyEWHDkwglxT7taiGWJhE",
   authDomain: "automapping-parking-slot.firebaseapp.com",
   databaseURL: "https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "automapping-parking-slot",
-  storageBucket: "automapping-parking-slot.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id"
+  storageBucket: "automapping-parking-slot.firebasestorage.app",
+  messagingSenderId: "743840389881",
+  appId: "1:743840389881:web:9d395e61f3299511752028",
+  measurementId: "G-4N6DTD95WS"
 });
 
 // Retrieve Firebase Messaging object
