@@ -11,9 +11,13 @@ import { getDatabase, ref, remove, update, set } from 'firebase/database';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
-  // Only databaseURL is strictly needed for Realtime Database reads.
-  // Add the rest if you use Auth, Storage, etc.
+  apiKey: "your-api-key",
+  authDomain: "automapping-parking-slot.firebaseapp.com",
   databaseURL: "https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "automapping-parking-slot",
+  storageBucket: "automapping-parking-slot.appspot.com",
+  messagingSenderId: "your-sender-id",
+  appId: "your-app-id"
 };
 
 const app = initializeApp(firebaseConfig);
