@@ -27,10 +27,15 @@
   "theme_color": "#F5A623",
   "background_color": "#ffffff",
   "scope": "/",
+  "prefer_related_applications": false,
+  "standalone": true,
+  "minimal_ui": false,
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
   "categories": ["utilities", "productivity", "lifestyle"],
   "lang": "en",
   "dir": "ltr",
-  "prefer_related_applications": false,
   "screenshots": [
     {
       "src": "screenshot1.png",
