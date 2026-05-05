@@ -56,7 +56,7 @@ export async function setShowSelectedBox(value) {
 export async function requestFCMToken() {
   try {
     const token = await getToken(messaging, {
-      vapidKey: 'YOUR_VAPID_PUBLIC_KEY', // Replace with your VAPID key from Firebase console
+      vapidKey: 'BM_9z_XZPL1A-NT1Qe7-m6LLTo0hlwbWBmNUsj0zZTiCtuKI3iMLl5k06XuD08yQobDL1i5vmeXnxIMWjQICcms', // Replace with your VAPID key from Firebase console
     });
     
     if (token) {

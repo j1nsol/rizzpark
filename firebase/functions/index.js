@@ -154,7 +154,7 @@ exports.onSlotStatusChange = functions.database
 
 // ── Cleanup Old Tokens Function ─────────────────────────────────────────────
 // Runs daily to clean up expired FCM tokens
-exports.cleanupExpiredTokens = functions.publib
+exports.cleanupExpiredTokens = functions.pubsub
   .schedule('0 2 * * *') // Run at 2 AM daily
   .timeZone('UTC')
   .onRun(async (context) => {
