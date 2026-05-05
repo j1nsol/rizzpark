@@ -130,6 +130,12 @@ export default function App() {
     if (notifPerm === 'granted') return;
     
     try {
+      // Register service worker first for FCM
+      if ('serviceWorker' in navigator) {
+        await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log('Service Worker registered for notifications');
+      }
+      
       // Use FCM for push notifications if supported
       if (fcm.isSupported) {
         await fcm.requestPermission();
