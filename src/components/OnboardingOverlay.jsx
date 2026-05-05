@@ -129,7 +129,7 @@ function DesktopCard({ onDismiss }) {
         </div>
 
         <div className="ob-skip">
-          <a onClick={onDismiss}>Already a user? Go to dashboard →</a>
+          <button onClick={onDismiss}>Already a user? Go to dashboard →</button>
         </div>
       </div>
     </div>
@@ -188,7 +188,7 @@ function MobileCard({ onDismiss }) {
           </button>
         </div>
         <div className="ob-skip">
-          <a onClick={onDismiss}>Don&apos;t show this again</a>
+          <button onClick={onDismiss}>Don&apos;t show this again</button>
         </div>
       </div>
     </div>

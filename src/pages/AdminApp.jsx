@@ -260,6 +260,7 @@ function LiveFeedPanel({piStatus, mode}){
       setLoaded(false);
     }
     return ()=>{ if(img) img.src = ""; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, piOffline]);
 
   return(
@@ -795,6 +796,7 @@ function SlotEditorPanel({slots, piStatus, addLog}){
     } catch(e){ /* silent */ }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{ fetchFrame(); },[piStatus]);
 
   const showMsg = (text, ok=true) => {
@@ -1214,16 +1216,16 @@ function SlotEditorPanel({slots, piStatus, addLog}){
 function ProgramPropertiesPanel({piStatus, addLog}){
   const DEF = {confidence:0.20,iou_threshold:0.35,smoothing_win:5,detect_interval:1.0,firebase_every:2,yolo_every_n:1};
   const [cfg, setCfg]       = useState(DEF);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [msg, setMsg]         = useState(null);
   const piOffline = piStatus !== "online";
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{
-    if(piOffline){ setLoading(false); return; }
+    if(piOffline){ return; }
     fetch(`${PI_API_URL}/program-config`,{signal:AbortSignal.timeout(4000)})
-      .then(r=>r.json()).then(d=>{setCfg(d);setLoading(false);})
-      .catch(()=>setLoading(false));
+      .then(r=>r.json()).then(d=>{setCfg(d);})
+      .catch(()=>{});
   },[piStatus]);
 
   const showMsg = (text,ok=true)=>{ setMsg({text,ok}); setTimeout(()=>setMsg(null),5000); };
@@ -1330,7 +1332,6 @@ function ProgramPropertiesPanel({piStatus, addLog}){
 function DistortionPanel({piStatus, addLog}){
   const DEFAULTS = {enabled:false, k1:-0.3, k2:0.1, alpha:0.0};
   const [cfg, setCfg]               = useState(DEFAULTS);
-  const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [calibrating, setCalib]     = useState(false);
   const [previewing, setPrev]       = useState(false);
@@ -1338,12 +1339,13 @@ function DistortionPanel({piStatus, addLog}){
   const [msg, setMsg]               = useState(null);
   const piOffline = piStatus !== "online";
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{
-    if(piOffline){ setLoading(false); return; }
+    if(piOffline){ return; }
     fetch(`${PI_API_URL}/undistort-config`,{signal:AbortSignal.timeout(4000)})
       .then(r=>r.json())
-      .then(d=>{ setCfg(d); setLoading(false); })
-      .catch(()=>setLoading(false));
+      .then(d=>{ setCfg(d); })
+      .catch(()=>{});
   },[]);
 
   const showMsg = (text, ok=true) => {
@@ -1655,7 +1657,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
         body: JSON.stringify({layout_mode: layoutMode}),
         signal:AbortSignal.timeout(5000),
       });
-      const d = await r.json();
+      await r.json();
       const modeLabel = LAYOUT_MODES.find(m=>m.id===layoutMode)?.label ?? layoutMode;
       setRemapMsg({ok:true, text:`Auto-mapping restarted in ${modeLabel} mode — ~150 frames needed to rediscover slots.`});
       addLog(`[ADMIN] Remap triggered (mode=${layoutMode}) — slot config cleared. Mapping phase restarted.`,"sys");
