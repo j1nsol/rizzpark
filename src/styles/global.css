@@ -372,8 +372,8 @@ body::before {
 }
 .ob-divider { height: 1px; background: var(--border); margin: 4px 0 14px; }
 .ob-skip { text-align: center; margin-top: 14px; font-size: 12px; color: var(--text-3); }
-.ob-skip a { color: var(--text-3); text-decoration: underline; cursor: pointer; }
-.ob-skip a:hover { color: var(--text-2); }
+.ob-skip a, .ob-skip button { color: var(--text-3); text-decoration: underline; cursor: pointer; background: none; border: none; padding: 0; font: inherit; }
+.ob-skip a:hover, .ob-skip button:hover { color: var(--text-2); }
 
 @media (max-width: 480px) {
   .ob-header { padding: 22px 24px 20px; }
