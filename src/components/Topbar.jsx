@@ -15,8 +15,11 @@ export default function Topbar({ notifPerm, onNotifClick }) {
   return (
     <header className="topbar">
       <div className="brand">
-        <div className="brand-name">Rizz<em>.</em>Park</div>
-        <div className="brand-tag">Smart Parking</div>
+        <img src="/topbar-logo.png" alt="Rizz Park" className="brand-favicon" />
+        <div className="brand-content">
+          <div className="brand-name">Rizz<em>.</em>Park</div>
+          <div className="brand-tag">Smart Parking</div>
+        </div>
       </div>
 
       <div className="topbar-right">
