@@ -33,6 +33,7 @@ export function useFCM() {
   // Request permission and get token, passing the SW registration to getToken
   const requestPermission = useCallback(async () => {
     if (!isSupported) throw new Error('Push notifications not supported');
+    if (!swRegistration) throw new Error('Service worker not ready yet — try again in a moment');
 
     setIsLoading(true);
     setError(null);

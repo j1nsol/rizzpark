@@ -60,6 +60,13 @@ export async function setShowSelectedBox(value) {
 // Request FCM token and store it in Firebase for push notifications
 export async function requestFCMToken(serviceWorkerRegistration) {
   try {
+    // Clear any stale push subscription — a leftover subscription with a
+    // different VAPID key causes a "push service error" AbortError.
+    if (serviceWorkerRegistration) {
+      const existing = await serviceWorkerRegistration.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
+    }
+
     const token = await getToken(messaging, {
       vapidKey: 'BM_9z_XZPL1A-NT1Qe7-m6LLTo0hlwbWBmNUsj0zZTiCtuKI3iMLl5k06XuD08yQobDL1i5vmeXnxIMWjQICcms',
       serviceWorkerRegistration,

@@ -192,15 +192,12 @@ function ParkingMap({slots,selectedSlot,onSelect,adminMode,onRemove}){
 }
 
 // ── Live Feed Panel ───────────────────────────────────────────────────────────
-function LiveFeedPanel({piStatus, mode}){
+function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, setPlayState, progress, setProgress}){
   const [active,      setActive]      = useState(true);
   const [loaded,      setLoaded]      = useState(false);
   const [error,       setError]       = useState(false);
   const [fps,         setFps]         = useState(0);
-  const [videoSource, setVideoSource] = useState("camera"); // "camera" | "video"
   const [videoFile,   setVideoFile]   = useState(null);
-  const [playState,   setPlayState]   = useState("stopped"); // "stopped"|"playing"|"paused"
-  const [progress,    setProgress]    = useState(null);
   const imgRef                        = useRef(null);
   const lastTime                      = useRef(Date.now());
   const piOffline                     = piStatus === "error";
@@ -1627,10 +1624,9 @@ function DriverUISettingsPanel(){
 }
 
 // ── Admin Panel ───────────────────────────────────────────────────────────────
-function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piStatus,firebaseStatus,mode}){
+function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piStatus,firebaseStatus,mode,section,setSection,videoSource,setVideoSource,videoPlayState,setVideoPlayState,videoProgress,setVideoProgress}){
   const [selected,setSelected]   = useState(null);
   const [confirm,setConfirm]     = useState(null);
-  const [section,setSection]     = useState("map");
   const [remapping,setRemapping] = useState(false);
   const [remapMsg,setRemapMsg]   = useState(null);
   const [layoutMode,setLayoutMode] = useState("auto");   // horizontal | vertical | grid | auto
@@ -1791,7 +1787,10 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
 
       {section==="feed"&&(
         <Card style={{padding:20}}>
-          <LiveFeedPanel piStatus={piStatus} mode={mode}/>
+          <LiveFeedPanel piStatus={piStatus} mode={mode}
+            videoSource={videoSource} setVideoSource={setVideoSource}
+            playState={videoPlayState} setPlayState={setVideoPlayState}
+            progress={videoProgress} setProgress={setVideoProgress}/>
         </Card>
       )}
 
@@ -2026,6 +2025,11 @@ export default function AdminApp(){
   const [fbStatus,setFbStatus]       = useState("checking");
   const [lastUpdated,setLastUpdated] = useState(null);
   const [mode, setModeState]         = useState(getMode);
+  // Lifted so state survives tab switches
+  const [adminSection,   setAdminSection]   = useState("map");
+  const [videoSource,    setVideoSource]    = useState("camera");
+  const [videoPlayState, setVideoPlayState] = useState("stopped");
+  const [videoProgress,  setVideoProgress]  = useState(null);
   const logId = useRef(0);
 
   const switchMode = useCallback((newMode) => {
@@ -2238,7 +2242,11 @@ export default function AdminApp(){
       <div style={{maxWidth:960,margin:"0 auto",padding:"24px 16px"}}>
         {tab==="user"
           ?<UserView slots={slots} firebaseStatus={fbStatus}/>
-          :<AdminPanel slots={slots} logs={logs} onRemove={handleRemove} removedSlots={removed} addLog={addLog} onImageAnalysis={handleImageAnalysis} piStatus={piStatus} firebaseStatus={fbStatus} mode={mode}/>}
+          :<AdminPanel slots={slots} logs={logs} onRemove={handleRemove} removedSlots={removed} addLog={addLog} onImageAnalysis={handleImageAnalysis} piStatus={piStatus} firebaseStatus={fbStatus} mode={mode}
+              section={adminSection} setSection={setAdminSection}
+              videoSource={videoSource} setVideoSource={setVideoSource}
+              videoPlayState={videoPlayState} setVideoPlayState={setVideoPlayState}
+              videoProgress={videoProgress} setVideoProgress={setVideoProgress}/>}
       </div>
     </div>
   );
