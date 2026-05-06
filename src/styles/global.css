@@ -52,13 +52,18 @@ body::before {
 
 /* ── Topbar ── */
 .topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 28px; background: var(--surface);
-  border-bottom: 1.5px solid var(--border); gap: 16px; flex-wrap: wrap;
-  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1.5px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
-.brand { display: flex; align-items: baseline; gap: 6px; }
-.brand-name { font-family: 'DM Serif Display', serif; font-size: 26px; letter-spacing: -0.3px; line-height: 1; }
+
+.brand { font-family: 'DM Serif Display', serif; font-size: 26px; letter-spacing: -0.3px; line-height: 1; }
 .brand-name em { color: var(--accent); font-style: normal; }
 .brand-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
 
