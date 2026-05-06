@@ -68,7 +68,7 @@ export async function requestFCMToken(serviceWorkerRegistration) {
     }
 
     const token = await getToken(messaging, {
-      vapidKey: 'BM_9z_XZPL1A-NT1Qe7-m6LLTo0hlwbWBmNUsj0zZTiCtuKI3iMLl5k06XuD08yQobDL1i5vmeXnxIMWjQICcms',
+      vapidKey: 'BKIbLxlszgR95LOgvBj766-OSlcSJanIlELAJ2UsOv0oZJh-6S5Iww8VWOPPEQT6XyaH9HmQoU0_5S0Lg9IMR1A',
       serviceWorkerRegistration,
     });
     
