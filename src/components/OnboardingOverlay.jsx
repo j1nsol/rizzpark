@@ -21,7 +21,13 @@ function ObHeader({ stepLabel }) {
 // ── Desktop flow ──────────────────────────────────────────────────────────────
 function DesktopCard({ onDismiss }) {
   const fcm = useFCM();
-  const [phase, setPhase] = useState('idle'); // idle | requesting | granted | denied
+  const initialPhase = (() => {
+    if (typeof Notification === 'undefined') return 'idle';
+    if (Notification.permission === 'granted') return 'granted';
+    if (Notification.permission === 'denied') return 'denied';
+    return 'idle';
+  })();
+  const [phase, setPhase] = useState(initialPhase); // idle | requesting | granted | denied
 
   async function handleAllow() {
     setPhase('requesting');
@@ -43,7 +49,14 @@ function DesktopCard({ onDismiss }) {
       }
     } catch (error) {
       console.error('Error requesting notification permission:', error);
-      setPhase('idle');
+      // Permission may already be granted even if FCM token registration failed
+      // (push service unreachable). Still mark as success so the user can proceed.
+      if (Notification.permission === 'granted') {
+        localStorage.setItem('rizzpark_notif', 'granted');
+        setPhase('granted');
+      } else {
+        setPhase('denied');
+      }
     }
   }
 
@@ -83,7 +96,7 @@ function DesktopCard({ onDismiss }) {
               <circle cx="7.5" cy="7.5" r="6.5" stroke="#C03030" strokeWidth="1.3" />
               <path d="M5 5l5 5M10 5l-5 5" stroke="#C03030" strokeWidth="1.3" strokeLinecap="round" />
             </svg>
-            Blocked — you can enable later in browser settings.
+            Blocked — click the lock icon in the address bar to re-enable.
           </div>
         )}
 
