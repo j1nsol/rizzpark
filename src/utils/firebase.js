@@ -58,10 +58,11 @@ export async function setShowSelectedBox(value) {
 // ── FCM Push Notification Helpers ────────────────────────────────────────
 
 // Request FCM token and store it in Firebase for push notifications
-export async function requestFCMToken() {
+export async function requestFCMToken(serviceWorkerRegistration) {
   try {
     const token = await getToken(messaging, {
-      vapidKey: 'BM_9z_XZPL1A-NT1Qe7-m6LLTo0hlwbWBmNUsj0zZTiCtuKI3iMLl5k06XuD08yQobDL1i5vmeXnxIMWjQICcms', // Replace with your VAPID key from Firebase console
+      vapidKey: 'BM_9z_XZPL1A-NT1Qe7-m6LLTo0hlwbWBmNUsj0zZTiCtuKI3iMLl5k06XuD08yQobDL1i5vmeXnxIMWjQICcms',
+      serviceWorkerRegistration,
     });
     
     if (token) {
