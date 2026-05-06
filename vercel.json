@@ -1,7 +1,7 @@
 {
   "rewrites": [
     { 
-      "source": "/((?!manifest\\.json|sw\\.js|firebase-messaging-sw\\.js|.*\\.(png|jpg|jpeg|gif|svg|ico|css|js)$).*)", 
+      "source": "/(.*)",
       "destination": "/index.html" 
     }
   ],
