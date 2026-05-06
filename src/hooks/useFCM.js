@@ -15,12 +15,15 @@ export function useFCM() {
     if (supported) setPermission(Notification.permission);
   }, []);
 
-  // Register the Firebase messaging service worker and store the registration
+  // Register the Firebase messaging service worker, then wait until it is
+  // active before storing the registration. getToken() requires an active SW —
+  // using an installing/waiting one causes "push service error".
   useEffect(() => {
     if (!isSupported) return;
 
     navigator.serviceWorker
       .register('/firebase-messaging-sw.js')
+      .then(() => navigator.serviceWorker.ready)
       .then((registration) => {
         setSwRegistration(registration);
       })

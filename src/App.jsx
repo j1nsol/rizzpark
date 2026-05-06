@@ -11,6 +11,8 @@ import {
 import { useTweaks }         from './hooks/useTweaks';
 import { useFirebaseSlots }  from './hooks/useFirebaseSlots';
 import { useFCM }            from './hooks/useFCM';
+import { useConsoleLog }     from './hooks/useConsoleLog';
+import ConsolePanel          from './components/ConsolePanel';
 import {
   canNotify, isGranted, requestPerm, fireNotif, ONBOARDING_KEY,
 } from './utils/parking';
@@ -25,6 +27,7 @@ export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const { slots, fbStatus, showSelectedBox } = useFirebaseSlots();
   const fcm = useFCM();
+  const { logs, clear } = useConsoleLog();
 
   const [selectedId,     setSelectedId]     = useState(null);
   const [filter,         setFilter]         = useState('all');
@@ -185,6 +188,7 @@ export default function App() {
       </div>
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      <ConsolePanel logs={logs} onClear={clear} />
 
       <TweaksPanel>
         <TweakSection label="Display" />
