@@ -1,7 +1,7 @@
 {
   "short_name": "Rizz Park",
   "name": "Rizz Park - Smart Parking",
-  "description": "Real-time parking availability notifications for smart parking management",
+  "description": "Find spots, not stress",
   "icons": [
     {
       "src": "favicon.ico",
@@ -9,13 +9,13 @@
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "android-chrome-192x192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any maskable"
     },
     {
-      "src": "logo512.png",
+      "src": "android-chrome-512x512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
@@ -27,15 +27,10 @@
   "theme_color": "#F5A623",
   "background_color": "#ffffff",
   "scope": "/",
-  "prefer_related_applications": false,
-  "standalone": true,
-  "minimal_ui": false,
-  "launch_handler": {
-    "client_mode": "focus-existing"
-  },
   "categories": ["utilities", "productivity", "lifestyle"],
   "lang": "en",
   "dir": "ltr",
+  "prefer_related_applications": false,
   "screenshots": [
     {
       "src": "screenshot1.png",
