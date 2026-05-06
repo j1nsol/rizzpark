@@ -1,64 +1,49 @@
 import { useState, useEffect, useCallback } from 'react';
 import { requestFCMToken, onFCMMessage, deleteFCMToken } from '../utils/firebase';
 
-/**
- * Hook for managing Firebase Cloud Messaging (FCM) push notifications
- * Handles token registration, permission management, and message handling
- */
 export function useFCM() {
   const [token, setToken] = useState(null);
   const [isSupported, setIsSupported] = useState(false);
   const [permission, setPermission] = useState('default');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [swRegistration, setSwRegistration] = useState(null);
 
-  // Check if FCM is supported on page load
   useEffect(() => {
     const supported = 'serviceWorker' in navigator && 'PushManager' in window;
     setIsSupported(supported);
-    
-    if (supported) {
-      setPermission(Notification.permission);
-    }
+    if (supported) setPermission(Notification.permission);
   }, []);
 
-  // Register service worker
+  // Register the Firebase messaging service worker and store the registration
   useEffect(() => {
     if (!isSupported) return;
 
-    const registerSW = async () => {
-      try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
-        console.log('Service Worker registered:', registration);
-      } catch (error) {
-        console.error('Service Worker registration failed:', error);
+    navigator.serviceWorker
+      .register('/firebase-messaging-sw.js')
+      .then((registration) => {
+        setSwRegistration(registration);
+      })
+      .catch((err) => {
+        console.error('Service Worker registration failed:', err);
         setError('Failed to register service worker');
-      }
-    };
-
-    registerSW();
+      });
   }, [isSupported]);
 
-  // Request permission and get token
+  // Request permission and get token, passing the SW registration to getToken
   const requestPermission = useCallback(async () => {
-    if (!isSupported) {
-      throw new Error('Push notifications not supported');
-    }
+    if (!isSupported) throw new Error('Push notifications not supported');
 
     setIsLoading(true);
     setError(null);
 
     try {
-      // Request notification permission
       const permission = await Notification.requestPermission();
       setPermission(permission);
 
-      if (permission !== 'granted') {
-        throw new Error('Notification permission denied');
-      }
+      if (permission !== 'granted') throw new Error('Notification permission denied');
 
-      // Get FCM token
-      const fcmToken = await requestFCMToken();
+      const fcmToken = await requestFCMToken(swRegistration);
       setToken(fcmToken);
 
       return fcmToken;
@@ -69,7 +54,7 @@ export function useFCM() {
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported]);
+  }, [isSupported, swRegistration]);
 
   // Handle incoming messages when app is in foreground
   const onMessage = useCallback((callback) => {
