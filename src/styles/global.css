@@ -111,6 +111,10 @@ body::before {
   border-radius: var(--r-sm); padding: 14px 12px;
   border: 1.5px solid var(--border); background: var(--bg);
   transition: box-shadow .2s;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 .stat-box:hover { box-shadow: var(--shadow-sm); }
 .stat-box.full { grid-column: 1/-1; background: var(--accent); border-color: var(--accent); }
