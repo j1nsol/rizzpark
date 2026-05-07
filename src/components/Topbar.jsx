@@ -15,8 +15,10 @@ export default function Topbar({ notifPerm, onNotifClick }) {
   return (
     <header className="topbar">
       <div className="brand">
+        <img src="/topbar-logo.png" alt="Rizz.Park" className="brand-icon" />
         <div className="brand-name">Rizz<em>.</em>Park</div>
-        <div className="brand-tag">Smart Parking</div>
+        <span className="brand-divider" />
+        <span className="brand-tag">Smart Parking</span>
       </div>
 
       <div className="topbar-right">
@@ -41,7 +43,7 @@ export default function Topbar({ notifPerm, onNotifClick }) {
             />
             <path d="M5.5 10a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.3" />
           </svg>
-          {notifLabel}
+          <span className="notif-label">{notifLabel}</span>
         </button>
 
         <button

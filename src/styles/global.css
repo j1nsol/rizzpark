@@ -55,7 +55,7 @@ body::before {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: 12px 24px;
   border-bottom: 1.5px solid var(--border);
   background: var(--surface);
   position: sticky;
@@ -63,15 +63,25 @@ body::before {
   z-index: 100;
 }
 
-.brand { font-family: 'DM Serif Display', serif; font-size: 26px; letter-spacing: -0.3px; line-height: 1; }
+.brand {
+  font-family: 'DM Serif Display', serif;
+  font-size: 26px;
+  letter-spacing: -0.3px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.brand-icon { height: 40px; width: auto; display: block; }
 .brand-name em { color: var(--accent); font-style: normal; }
-.brand-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.brand-divider { width: 1px; height: 18px; background: var(--border-2); margin: 0 6px; flex-shrink: 0; }
+.brand-tag { font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-3); }
 
-.topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
 
 .live-pill {
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 12px; border-radius: 999px;
+  height: 34px; padding: 0 14px; border-radius: var(--r-sm);
   background: var(--vacant-bg); border: 1.5px solid var(--vacant-border);
   font-size: 12px; font-weight: 600; color: var(--vacant);
 }
@@ -80,7 +90,7 @@ body::before {
 
 .notif-btn {
   display: flex; align-items: center; gap: 7px;
-  padding: 8px 16px; border-radius: var(--r-sm);
+  height: 34px; padding: 0 14px; border-radius: var(--r-sm);
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
   cursor: pointer; border: 1.5px solid var(--border-2);
   background: var(--surface); color: var(--text-2);
@@ -406,8 +416,11 @@ body::before {
     order: 2; /* Keep occupied box in middle */
   }
   .slot-card { width: 70px; height: 64px; }
-  .topbar { padding: 12px 16px; }
+  .topbar { padding: 10px 16px; }
   .grid-area { padding: 16px; }
+.notif-label { display: none; }
+  .notif-btn { padding: 8px; }
+  .live-pill { padding: 5px 10px; }
 }
 
 /* ── TweaksPanel (inlined from tweaks-panel.jsx) ── */
@@ -497,7 +510,7 @@ select.twk-field{padding-right:22px;
 /* ── Settings Button ── */
 .settings-btn {
   background: rgba(0, 0, 0, 0.06);
-  border: none;
+  border: 1.5px solid var(--border-2);
   color: var(--text-2);
   padding: 8px;
   border-radius: 8px;
@@ -520,140 +533,3 @@ select.twk-field{padding-right:22px;
 
 /* ── Import Notification Settings Styles ── */
 @import './NotificationSettings.css';
-
-/* ── Console Panel ── */
-.con-wrap {
-  position: fixed;
-  bottom: 16px;
-  left: 16px;
-  z-index: 9000;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.con-btn {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  background: #1e1e1e;
-  color: #a8ff78;
-  border: none;
-  border-radius: var(--r-sm);
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: var(--shadow-md);
-  transition: opacity .15s, transform .15s;
-  user-select: none;
-}
-.con-btn:hover { opacity: .85; transform: scale(1.03); }
-.con-btn:active { transform: scale(.97); }
-
-.con-btn-icon { letter-spacing: .5px; }
-
-.con-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  background: var(--occupied);
-  color: #fff;
-  font-family: system-ui, sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.con-panel {
-  width: 420px;
-  max-width: calc(100vw - 32px);
-  background: #1e1e1e;
-  border-radius: var(--r-sm);
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.con-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  background: #2d2d2d;
-  border-bottom: 1px solid #3a3a3a;
-  flex-shrink: 0;
-}
-
-.con-title {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  color: #a8ff78;
-  letter-spacing: .5px;
-}
-
-.con-actions { display: flex; gap: 6px; align-items: center; }
-
-.con-clear, .con-close {
-  background: transparent;
-  border: 1px solid #555;
-  color: #aaa;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all .15s;
-  font-family: system-ui, sans-serif;
-}
-.con-clear:hover { border-color: #aaa; color: #fff; }
-.con-close:hover { border-color: var(--occupied); color: var(--occupied); }
-
-.con-body {
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 4px 0;
-  font-family: 'Courier New', monospace;
-  font-size: 11px;
-  line-height: 1.55;
-}
-.con-body::-webkit-scrollbar { width: 5px; }
-.con-body::-webkit-scrollbar-track { background: #1e1e1e; }
-.con-body::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
-
-.con-empty {
-  padding: 12px 10px;
-  color: #555;
-  font-style: italic;
-  font-family: system-ui, sans-serif;
-  font-size: 11px;
-}
-
-.con-entry {
-  display: grid;
-  grid-template-columns: 56px 36px 1fr;
-  gap: 6px;
-  padding: 2px 10px;
-  color: #ccc;
-  border-bottom: 1px solid #2a2a2a;
-  word-break: break-all;
-}
-.con-entry:last-child { border-bottom: none; }
-.con-entry.warn { color: #e8a800; background: rgba(232,168,0,.06); }
-.con-entry.error { color: #f47777; background: rgba(244,119,119,.08); }
-
-.con-ts { color: #555; font-size: 10px; padding-top: 1px; white-space: nowrap; }
-.con-level { color: #666; font-size: 10px; padding-top: 1px; white-space: nowrap; }
-.con-entry.warn .con-level { color: #c97900; }
-.con-entry.error .con-level { color: #d93a3a; }
-.con-msg { white-space: pre-wrap; }
