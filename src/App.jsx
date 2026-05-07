@@ -3,6 +3,8 @@ import './styles/global.css';
 import Topbar            from './components/Topbar';
 import Sidebar           from './components/Sidebar';
 import ParkingCardGrid   from './components/ParkingCardGrid';
+import GoogleMapView     from './components/GoogleMapView';
+import MapIntro          from './components/MapIntro';
 import ToastStack        from './components/ToastStack';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import {
@@ -38,6 +40,8 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(
     () => localStorage.getItem(ONBOARDING_KEY) !== '1'
   );
+  const [showMap,        setShowMap]        = useState(false);
+  const [showMapIntro,   setShowMapIntro]   = useState(false);
 
   const toastId      = useRef(0);
   const prevSlotsRef = useRef([]);
@@ -152,12 +156,14 @@ export default function App() {
   return (
     <div className="app" style={accentStyle}>
       {showOnboarding && (
-        <OnboardingOverlay onDismiss={() => setShowOnboarding(false)} />
+        <OnboardingOverlay onDismiss={() => { setShowOnboarding(false); setShowMapIntro(true); }} />
       )}
 
       <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} />
 
-      <div className="main">
+      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} />}
+
+      <div className="main" style={showMapIntro ? { display: 'none' } : {}}>
         <Sidebar
           slots={slots}
           filter={filter}
@@ -174,6 +180,10 @@ export default function App() {
               <div className="grid-title">Ground Floor — Parking Map</div>
               <div className="grid-subtitle">{statusLine}</div>
             </div>
+            <button className="map-view-btn" onClick={() => setShowMap(true)}>
+              <img src="/topbar-logo.png" alt="" style={{ width: 18, height: 18, objectFit: 'contain' }} />
+              Map View
+            </button>
           </div>
 
           <ParkingCardGrid
@@ -186,6 +196,8 @@ export default function App() {
           />
         </div>
       </div>
+
+      {showMap && <GoogleMapView onClose={() => setShowMap(false)} />}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
       <ConsolePanel logs={logs} onClear={clear} />
