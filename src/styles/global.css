@@ -418,7 +418,7 @@ body::before {
   .slot-card { width: 70px; height: 64px; }
   .topbar { padding: 10px 16px; }
   .grid-area { padding: 16px; }
-.notif-label { display: none; }
+.notif-label, .brand-tag, .brand-divider { display: none; }
   .notif-btn { padding: 8px; }
   .live-pill { padding: 5px 10px; }
 }
