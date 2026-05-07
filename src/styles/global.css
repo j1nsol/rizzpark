@@ -90,7 +90,7 @@ body::before {
 
 .notif-btn {
   display: flex; align-items: center; gap: 7px;
-  height: 34px; padding: 0 14px; border-radius: var(--r-sm);
+  padding: 8px 16px; border-radius: var(--r-sm);
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
   cursor: pointer; border: 1.5px solid var(--border-2);
   background: var(--surface); color: var(--text-2);
@@ -188,8 +188,8 @@ body::before {
 .grid-topbar {
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
 }
-.grid-title { font-size: 15px; font-weight: 600; }
-.grid-subtitle { font-size: 12px; color: var(--text-3); }
+.grid-title { font-size: 20px; font-weight: 600; }
+.grid-subtitle { font-size: 15px; color: var(--text-3); }
 .sim-btn {
   padding: 8px 18px; border-radius: var(--r-sm);
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
@@ -512,7 +512,7 @@ select.twk-field{padding-right:22px;
   background: rgba(0, 0, 0, 0.06);
   border: 1.5px solid var(--border-2);
   color: var(--text-2);
-  padding: 8px;
+  padding: 9px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
