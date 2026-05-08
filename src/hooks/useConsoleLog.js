@@ -15,14 +15,27 @@ function serialize(args) {
 
 export function useConsoleLog() {
   const [logs, setLogs] = useState([]);
-  const originals = useRef({});
+  const originals  = useRef({});
+  // FIX: Re-entrancy guard — prevents infinite loop when React itself calls
+  // console.error (e.g. for duplicate key warnings), which would trigger
+  // setLogs → re-render → React error → console.error → setLogs → ...
+  const isLogging  = useRef(false);
 
   const append = useCallback((level, args) => {
+    // If we're already inside an append call (re-entrant), skip silently.
+    // The original console method has already been called, so nothing is lost.
+    if (isLogging.current) return;
+    isLogging.current = true;
+
     const entry = { id: ++entryId, level, message: serialize(args), ts: new Date() };
     setLogs(prev => {
       const next = [...prev, entry];
       return next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next;
     });
+
+    // Use a microtask to reset the flag AFTER React has processed the setState,
+    // so any console calls triggered by the re-render are still guarded.
+    Promise.resolve().then(() => { isLogging.current = false; });
   }, []);
 
   useEffect(() => {
