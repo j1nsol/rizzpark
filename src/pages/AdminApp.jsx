@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { normalizeAdminSlotsObject } from "../utils/slotModel";
-import { deleteSlot } from "../utils/firebase";
+import { deleteSlot, savePinSlotLayout } from "../utils/firebase";
+import AdminMapEditor from "../components/AdminMapEditor";
 import ParkingCardGrid from "../components/ParkingCardGrid";
 import { getApiUrl, getMode, setMode, getFirebaseParkingPath } from "../config/modeConfig";
 
@@ -742,6 +743,9 @@ function SlotEditorPanel({slots, piStatus, addLog}){
   const [isDirty, setIsDirty]             = useState(false);
   // Track whether editSlots has been initialised at least once
   const initialised                       = useRef(false);
+  // Pin code assignment — when set, saves also write to /pin_slot_layouts/{pinCode}
+  const [mapPins,          setMapPins]          = useState([]);
+  const [selectedPinCode,  setSelectedPinCode]  = useState('');
 
   const imgSize = {w: CAM_W, h: CAM_H};
   const piOffline = piStatus !== "online";
@@ -795,6 +799,15 @@ function SlotEditorPanel({slots, piStatus, addLog}){
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{ fetchFrame(); },[piStatus]);
+
+  useEffect(()=>{
+    fetch(`${FIREBASE_URL}/map_pins.json`)
+      .then(r=>r.json())
+      .then(data=>{
+        if(data && typeof data==="object") setMapPins(Object.values(data));
+      })
+      .catch(()=>{});
+  },[]);
 
   const showMsg = (text, ok=true) => {
     setMsg({text,ok}); setTimeout(()=>setMsg(null), 5000);
@@ -958,6 +971,14 @@ function SlotEditorPanel({slots, piStatus, addLog}){
       });
       const d = await r.json();
       if(d.error) throw new Error(d.error);
+      if(selectedPinCode){
+        try {
+          await savePinSlotLayout(selectedPinCode, slotId, quad, editSlots[slotId]?.row ?? null);
+          addLog(`[EDITOR] ${slotId} layout saved to pin ${selectedPinCode}`, "sys");
+        } catch(e){
+          addLog(`[EDITOR] Pin layout save failed: ${e.message}`, "error");
+        }
+      }
       showMsg(`Slot ${slotId} saved.`);
       addLog(`[EDITOR] ${slotId} quad updated — ${quad.map(p=>p.join(",")).join(" | ")}`, "sys");
       setIsDirty(false);  // saved — Firebase syncs are safe again
@@ -978,9 +999,15 @@ function SlotEditorPanel({slots, piStatus, addLog}){
           body: JSON.stringify({coords: s.quad}),
           signal: AbortSignal.timeout(5000),
         });
+        if(selectedPinCode){
+          try {
+            await savePinSlotLayout(selectedPinCode, id, s.quad, s.row ?? null);
+          } catch { /* non-fatal */ }
+        }
         ok++;
       } catch { fail++; }
     }
+    if(selectedPinCode && ok>0) addLog(`[EDITOR] Saved ${ok} slot layouts to pin ${selectedPinCode}`, "sys");
     showMsg(`Saved ${ok} slots${fail?`, ${fail} failed`:"."}`);
     addLog(`[EDITOR] Saved all ${ok} slots to Pi`, "sys");
     if(!fail) setIsDirty(false);  // fully saved — Firebase syncs are safe again
@@ -1031,6 +1058,24 @@ function SlotEditorPanel({slots, piStatus, addLog}){
 
   return (
     <div style={{display:"flex", flexDirection:"column", gap:14}}>
+      <Card style={{padding:"10px 16px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <span style={{fontFamily:C.mono,fontSize:11,color:C.muted,whiteSpace:"nowrap"}}>Assign to Pin:</span>
+          <select value={selectedPinCode} onChange={e=>setSelectedPinCode(e.target.value)}
+            style={{background:"#0f172a",border:`1px solid ${C.border}`,color:C.text,
+              borderRadius:8,padding:"6px 10px",fontFamily:C.mono,fontSize:12,cursor:"pointer"}}>
+            <option value="">— None (global layout) —</option>
+            {mapPins.map(p=>(
+              <option key={p.pinCode} value={p.pinCode}>{p.pinCode} — {p.name}</option>
+            ))}
+          </select>
+          {selectedPinCode&&(
+            <span style={{fontFamily:C.mono,fontSize:10,color:C.vac}}>
+              Saves will also write to /pin_slot_layouts/{selectedPinCode}
+            </span>
+          )}
+        </div>
+      </Card>
       {piOffline&&(
         <div style={{padding:"12px 16px",borderRadius:10,background:`${C.occ}12`,border:`1px solid ${C.occ}33`,fontFamily:C.mono,fontSize:11,color:C.occ}}>
           ⚠️ Pi is offline — slot editing requires a live connection.
@@ -1674,6 +1719,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
     {id:"program",    label:"⚙️ Properties"},
     {id:"image",      label:"🖼️ Image Test"},
     {id:"logs",       label:"📡 AI Feed"},
+    {id:"mapped",     label:"📍 Pins"},
   ];
 
   return(
@@ -1830,6 +1876,16 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
             <span style={{fontFamily:C.mono,fontSize:10,color:C.accent,animation:"blink 1.2s infinite",marginLeft:4}}>●</span>
           </div>
           <AITerminal logs={logs}/>
+        </Card>
+      )}
+
+      {section==="mapped"&&(
+        <Card style={{padding:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+            <span style={{fontFamily:C.sans,fontWeight:700,fontSize:15}}>Mapped Locations</span>
+            <span style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>— geo pins saved to Firebase</span>
+          </div>
+          <AdminMapEditor/>
         </Card>
       )}
 

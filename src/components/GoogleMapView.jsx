@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -12,19 +13,16 @@ const parkingIcon = L.icon({
 const DEFAULT_CENTER = [10.294756867999133, 123.8805492386066];
 const MAP_ZOOM = 14 ;
 
-export default function GoogleMapView({ onClose }) {
+export default function GoogleMapView({ onClose, pins = [] }) {
+  const navigate        = useNavigate();
   const mapRef          = useRef(null);
   const instanceRef     = useRef(null);
   const searchMarkerRef = useRef(null);
-  const userMarkersRef  = useRef(new Map());
-  const pinCountRef     = useRef(0);
-  const addingRef       = useRef(false);
-  const disableAddRef   = useRef(null);
+  const fbMarkersRef    = useRef(new Map());
 
   const [query,     setQuery]     = useState('');
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState(null);
-  const [addMode,   setAddMode]   = useState(false);
 
   useEffect(() => {
     if (instanceRef.current) return;
@@ -48,51 +46,12 @@ export default function GoogleMapView({ onClose }) {
     defaultLabel.className = 'pin-popup-title';
     defaultLabel.innerHTML = '<b>Rizz.Park</b> — Smart Parking';
 
-    const defaultDel = document.createElement('button');
-    defaultDel.className   = 'pin-popup-delete';
-    defaultDel.textContent = 'Delete pin';
-    defaultDel.onclick = () => { defaultMarker.remove(); };
-
     defaultWrap.appendChild(defaultLabel);
-    defaultWrap.appendChild(defaultDel);
 
-    const defaultMarker = L.marker(DEFAULT_CENTER, { icon: parkingIcon })
+    L.marker(DEFAULT_CENTER, { icon: parkingIcon })
       .addTo(map)
       .bindPopup(defaultWrap)
       .openPopup();
-
-    map.on('click', (e) => {
-      if (!addingRef.current) return;
-
-      const id = ++pinCountRef.current;
-
-      // Build popup DOM so we can attach the delete handler
-      const wrap = document.createElement('div');
-      wrap.className = 'pin-popup';
-
-      const input = document.createElement('input');
-      input.className    = 'pin-popup-input';
-      input.placeholder  = 'Name this pin…';
-
-      const del = document.createElement('button');
-      del.className   = 'pin-popup-delete';
-      del.textContent = 'Delete pin';
-      del.onclick = () => {
-        const m = userMarkersRef.current.get(id);
-        if (m) { m.remove(); userMarkersRef.current.delete(id); }
-      };
-
-      wrap.appendChild(input);
-      wrap.appendChild(del);
-
-      const marker = L.marker(e.latlng, { icon: parkingIcon })
-        .addTo(map)
-        .bindPopup(wrap)
-        .openPopup();
-
-      userMarkersRef.current.set(id, marker);
-      disableAddRef.current?.();
-    });
 
     return () => {
       map.remove();
@@ -100,13 +59,49 @@ export default function GoogleMapView({ onClose }) {
     };
   }, []);
 
-  // Keep cursor style and disable callback in sync with add mode
+  // Render Firebase-saved parking location pins
   useEffect(() => {
-    addingRef.current  = addMode;
-    disableAddRef.current = () => setAddMode(false);
-    if (!instanceRef.current) return;
-    instanceRef.current.getContainer().style.cursor = addMode ? 'crosshair' : '';
-  }, [addMode]);
+    if (!instanceRef.current || !pins.length) return;
+
+    // Remove old Firebase markers not in the current pins list
+    const currentCodes = new Set(pins.map(p => p.pinCode));
+    fbMarkersRef.current.forEach((marker, code) => {
+      if (!currentCodes.has(code)) {
+        marker.remove();
+        fbMarkersRef.current.delete(code);
+      }
+    });
+
+    pins.forEach(pin => {
+      if (fbMarkersRef.current.has(pin.pinCode)) return;
+
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:150px';
+
+      const title = document.createElement('div');
+      title.style.cssText = 'font-family:sans-serif;font-size:13px;font-weight:700';
+      title.textContent = pin.name;
+
+      const code = document.createElement('div');
+      code.style.cssText = 'font-family:monospace;font-size:11px;color:#64748b';
+      code.textContent = `📍 ${pin.pinCode}`;
+
+      const navBtn = document.createElement('button');
+      navBtn.textContent = 'View Parking →';
+      navBtn.style.cssText = 'margin-top:4px;padding:5px 12px;border-radius:6px;border:1px solid #10b98144;background:#10b98115;color:#10b981;font-family:monospace;font-size:11px;cursor:pointer;font-weight:700';
+      navBtn.onclick = () => navigate(`/${pin.pinCode}`);
+
+      wrap.appendChild(title);
+      wrap.appendChild(code);
+      wrap.appendChild(navBtn);
+
+      const marker = L.marker([pin.lat, pin.lng], { icon: parkingIcon })
+        .addTo(instanceRef.current)
+        .bindPopup(wrap);
+
+      fbMarkersRef.current.set(pin.pinCode, marker);
+    });
+  }, [pins]);
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -177,15 +172,6 @@ export default function GoogleMapView({ onClose }) {
             </button>
           </form>
 
-          <button
-            className={`map-addpin-btn${addMode ? ' active' : ''}`}
-            onClick={() => setAddMode(v => !v)}
-            title={addMode ? 'Cancel adding pin' : 'Add a pin'}
-          >
-            <img src="/topbar-logo.png" alt="" style={{ width: 18, height: 18, objectFit: 'contain' }} />
-            {addMode ? 'Cancel' : 'Add Pin'}
-          </button>
-
           <button className="map-close-btn" onClick={onClose} title="Close map">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -194,12 +180,6 @@ export default function GoogleMapView({ onClose }) {
         </div>
 
         <div ref={mapRef} className="map-container" />
-
-        {addMode && (
-          <div className="map-add-hint">
-            Click anywhere on the map to place a pin
-          </div>
-        )}
 
       </div>
     </div>

@@ -103,3 +103,17 @@ export async function deleteFCMToken(token) {
     console.error('Error deleting FCM token:', error);
   }
 }
+
+// ── Map Pin Helpers ───────────────────────────────────────────────────────────
+
+export async function saveMapPin(pinCode, name, lat, lng) {
+  await set(ref(db, `map_pins/${pinCode}`), { name, lat, lng, pinCode, createdAt: Date.now() });
+}
+
+export async function deleteMapPin(pinCode) {
+  await remove(ref(db, `map_pins/${pinCode}`));
+}
+
+export async function savePinSlotLayout(pinCode, slotId, coords, row) {
+  await set(ref(db, `pin_slot_layouts/${pinCode}/${slotId}`), { coords, row: row ?? null });
+}

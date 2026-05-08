@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import App from './App'
 import AdminApp from './pages/AdminApp'
+import PinLocationPage from './pages/PinLocationPage'
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
@@ -23,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/admin" element={<AdminApp />} />
+        <Route path="/:pinCode" element={<PinLocationPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

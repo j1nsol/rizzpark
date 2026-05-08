@@ -42,6 +42,7 @@ export default function App() {
   );
   const [showMap,        setShowMap]        = useState(false);
   const [showMapIntro,   setShowMapIntro]   = useState(false);
+  const [allPins,        setAllPins]        = useState([]);
 
   const toastId      = useRef(0);
   const prevSlotsRef = useRef([]);
@@ -73,6 +74,14 @@ export default function App() {
 
     return unsubscribe;
   }, [fcm.token, fcm.onMessage]);
+
+  // Load Firebase geo pins for the map
+  useEffect(() => {
+    fetch('https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app/map_pins.json')
+      .then(r => r.json())
+      .then(data => { if (data && typeof data === 'object') setAllPins(Object.values(data)); })
+      .catch(() => {});
+  }, []);
 
   // Detect occupied→vacant transitions and fire notifications + toasts
   useEffect(() => {
@@ -197,7 +206,7 @@ export default function App() {
         </div>
       </div>
 
-      {showMap && <GoogleMapView onClose={() => setShowMap(false)} />}
+      {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} />}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
       <ConsolePanel logs={logs} onClear={clear} />
