@@ -110,7 +110,7 @@ firebase deploy --only hosting
 ### 5.3 Verify PWA Installation
 - Test on actual mobile devices
 - Verify "Add to Home Screen" prompt appears
-- Test notifications when app is minimized
+- Test notifications when   app is minimized
 - Test notifications when app is closed
 
 ## Troubleshooting

@@ -3,7 +3,7 @@ import { normalizeAdminSlotsObject } from "../utils/slotModel";
 import { deleteSlot, savePinSlotLayout } from "../utils/firebase";
 import AdminMapEditor from "../components/AdminMapEditor";
 import ParkingCardGrid from "../components/ParkingCardGrid";
-import { getApiUrl, getMode, setMode, getFirebaseParkingPath } from "../config/modeConfig";
+import { getApiUrl, getMode, setMode, getFirebaseParkingPath, getFirebasePath, setFirebasePath } from "../config/modeConfig";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIG — update these two values for your setup
@@ -199,10 +199,11 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
   const [error,       setError]       = useState(false);
   const [fps,         setFps]         = useState(0);
   const [videoFile,   setVideoFile]   = useState(null);
+  const [vidLoading,  setVidLoading]  = useState(false);
+  const [vidError,    setVidError]    = useState(null);
   const imgRef                        = useRef(null);
   const lastTime                      = useRef(Date.now());
   const piOffline                     = piStatus === "error";
-  const isDesktop                     = mode === "desktop";
   const streamUrl                     = `${PI_API_URL}/stream`;
 
   // Poll /video/status while video is playing
@@ -220,18 +221,29 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
   }, [playState]);
 
   const videoCall = async (endpoint, body = null) => {
-    try {
-      await fetch(`${PI_API_URL}${endpoint}`, { method: "POST", ...(body ? { body } : {}) });
-    } catch { /* server errors shown by piOffline state */ }
+    const r = await fetch(`${PI_API_URL}${endpoint}`, { method: "POST", ...(body ? { body } : {}) });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${r.status}`);
+    }
+    return r.json().catch(() => null);
   };
 
   const handleVideoLoad = async () => {
     if (!videoFile) return;
+    setVidLoading(true);
+    setVidError(null);
     const fd = new FormData();
     fd.append("video", videoFile);
-    await videoCall("/video/load", fd);
-    setPlayState("stopped");
-    setProgress(null);
+    try {
+      await videoCall("/video/load", fd);
+      setPlayState("stopped");
+      setProgress(null);
+    } catch (e) {
+      setVidError(e.message);
+    } finally {
+      setVidLoading(false);
+    }
   };
 
   const onFrameLoad = () => {
@@ -264,24 +276,22 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
-      {/* ── Source selector (Desktop mode only) ─────────────────────── */}
-      {isDesktop && (
-        <div style={{display:"flex",gap:6}}>
-          {[["camera","📹 Camera"],["video","🎬 Video File"]].map(([src,label])=>(
-            <button key={src} onClick={()=>setVideoSource(src)}
-              style={{padding:"5px 14px",borderRadius:8,
-                border:`1px solid ${videoSource===src?C.accent+"55":"rgba(255,255,255,.1)"}`,
-                background:videoSource===src?`${C.accent}15`:"transparent",
-                color:videoSource===src?C.accent:C.muted,
-                fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all .15s"}}>
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* ── Source selector ─────────────────────────────────────────── */}
+      <div style={{display:"flex",gap:6}}>
+        {[["camera","📹 Camera"],["video","🎬 Video File"]].map(([src,label])=>(
+          <button key={src} onClick={()=>setVideoSource(src)}
+            style={{padding:"5px 14px",borderRadius:8,
+              border:`1px solid ${videoSource===src?C.accent+"55":"rgba(255,255,255,.1)"}`,
+              background:videoSource===src?`${C.accent}15`:"transparent",
+              color:videoSource===src?C.accent:C.muted,
+              fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all .15s"}}>
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {/* ── Video file controls (Desktop + Video source only) ────────── */}
-      {isDesktop && videoSource==="video" && (
+      {/* ── Video file controls ──────────────────────────────────────── */}
+      {videoSource==="video" && (
         <div style={{display:"flex",flexDirection:"column",gap:10,padding:"12px 14px",
           borderRadius:10,background:"rgba(56,189,248,.06)",border:`1px solid rgba(56,189,248,.2)`}}>
           {/* File picker */}
@@ -292,14 +302,21 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
             <input type="file" accept="video/*" style={{display:"none"}}
               onChange={e => { setVideoFile(e.target.files[0]); setPlayState("stopped"); setProgress(null); }}/>
           </label>
+          {/* Error banner */}
+          {vidError && (
+            <div style={{padding:"8px 12px",borderRadius:8,background:`${C.occ}15`,
+              border:`1px solid ${C.occ}44`,fontFamily:C.mono,fontSize:10,color:C.occ}}>
+              ⚠ {vidError}
+            </div>
+          )}
           {/* Controls */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <button onClick={handleVideoLoad} disabled={!videoFile||piOffline}
+            <button onClick={handleVideoLoad} disabled={!videoFile||piOffline||vidLoading}
               style={{padding:"6px 14px",borderRadius:8,
                 border:`1px solid ${C.accent}55`,background:`${C.accent}15`,color:C.accent,
                 fontFamily:C.mono,fontSize:10,fontWeight:700,
-                cursor:(!videoFile||piOffline)?"not-allowed":"pointer"}}>
-              ⬆ Load
+                cursor:(!videoFile||piOffline||vidLoading)?"not-allowed":"pointer"}}>
+              {vidLoading ? "Uploading…" : "⬆ Load"}
             </button>
             {playState!=="playing"
               ? <button onClick={async()=>{await videoCall("/video/start");setPlayState("playing");}}
@@ -2081,6 +2098,7 @@ export default function AdminApp(){
   const [fbStatus,setFbStatus]       = useState("checking");
   const [lastUpdated,setLastUpdated] = useState(null);
   const [mode, setModeState]         = useState(getMode);
+  const [firebasePath, setFirebasePathState] = useState(getFirebasePath);
   // Lifted so state survives tab switches
   const [adminSection,   setAdminSection]   = useState("map");
   const [videoSource,    setVideoSource]    = useState("camera");
@@ -2092,6 +2110,12 @@ export default function AdminApp(){
     PI_API_URL = setMode(newMode);  // update module-level var + localStorage
     setModeState(newMode);          // trigger full re-render
     setPiStatus("checking");        // amber dot immediately
+  }, []);
+
+  const switchFirebasePath = useCallback((newPath) => {
+    setFirebasePath(newPath);       // persist to localStorage + module var
+    setFirebasePathState(newPath);  // trigger re-render + effect restart
+    setFbStatus("checking");
   }, []);
 
   const addLog = useCallback((msg,type="info")=>{
@@ -2177,8 +2201,7 @@ export default function AdminApp(){
 
     poll();
     return ()=>{ if(timerId) clearTimeout(timerId); };
-  // mode in deps so the poll restarts with the new Firebase path on mode switch
-  },[addLog, mode]);
+  },[addLog, mode, firebasePath]);
 
   // Fix #5: slot_layout is the authoritative source of coords.
   // Poll it every 10s so the map updates automatically after a Remap
@@ -2220,8 +2243,7 @@ export default function AdminApp(){
     loadLayout();
     const iv = setInterval(loadLayout, 10000);   // refresh every 10s to catch Remaps
     return ()=>clearInterval(iv);
-  // mode in deps so layout path updates when mode switches
-  },[addLog, mode]);
+  },[addLog, mode, firebasePath]);
 
   const handleRemove = useCallback(async (id)=>{
     // Optimistically remove from UI so the action feels instant.
@@ -2278,6 +2300,16 @@ export default function AdminApp(){
               style={{padding:"0 16px",height:58,border:"none",cursor:"pointer",fontFamily:C.sans,fontWeight:700,fontSize:13,background:"transparent",color:tab===t.id?t.id==="admin"?C.occ:C.accent:C.muted,borderBottom:tab===t.id?`2px solid ${t.id==="admin"?C.occ:C.accent}`:"2px solid transparent",transition:"all .2s"}}>{t.label}</button>
           ))}
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
+            <button
+              onClick={() => switchFirebasePath(firebasePath === "parking" ? "parking_desktop" : "parking")}
+              title={`Firebase path: /${firebasePath}. Click to switch.`}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:8,
+                border:`1px solid ${firebasePath==="parking"?"rgba(16,185,129,.4)":"rgba(251,191,36,.4)"}`,
+                background:firebasePath==="parking"?"rgba(16,185,129,.12)":"rgba(251,191,36,.12)",
+                color:firebasePath==="parking"?C.vac:"#FBBF24",
+                fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+              {firebasePath === "parking" ? "🔥 Prod DB" : "🧪 Test DB"}
+            </button>
             <button
               onClick={() => switchMode(mode === "pi" ? "desktop" : "pi")}
               title={`${mode === "pi" ? "Pi" : "Desktop"} Mode — API: ${PI_API_URL}. Click to switch.`}

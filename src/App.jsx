@@ -19,6 +19,7 @@ import {
   canNotify, isGranted, requestPerm, fireNotif, ONBOARDING_KEY,
 } from './utils/parking';
 import { setSlotOverride } from './utils/firebase';
+import { getFirebasePath } from './config/modeConfig';
 
 const TWEAK_DEFAULTS = {
   showCarIcon: true,
@@ -27,7 +28,7 @@ const TWEAK_DEFAULTS = {
 
 export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { slots, fbStatus, showSelectedBox } = useFirebaseSlots();
+  const { slots, fbStatus, showSelectedBox } = useFirebaseSlots(getFirebasePath());
   const fcm = useFCM();
   const { logs, clear } = useConsoleLog();
 
