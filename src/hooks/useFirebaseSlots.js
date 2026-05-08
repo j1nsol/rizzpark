@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { normalizeAdminSlotsObject } from '../utils/slotModel';
+import { getFirebasePath } from '../config/modeConfig';
 
 const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
 const BASE_DELAY   = 3000;
@@ -12,7 +13,11 @@ const MAX_DELAY    = 30000;
 //   fbStatus        : 'checking' | 'online' | 'error'
 //   lastUpdated     : number | null     — Unix ms of last successful poll
 //   showSelectedBox : boolean           — admin-controlled visibility of the Selected Box card
-export function useFirebaseSlots() {
+//
+// firebasePath — which Firebase node to poll (e.g. "parking" or "parking_desktop").
+//               Defaults to whatever is stored in localStorage via modeConfig.
+export function useFirebaseSlots(firebasePath) {
+  const path = firebasePath || getFirebasePath();
   const [slots,              setSlots]              = useState([]);
   const [fbStatus,           setFbStatus]           = useState('checking');
   const [lastUpdated,        setLastUpdated]        = useState(null);
@@ -24,7 +29,7 @@ export function useFirebaseSlots() {
   useEffect(() => {
     const loadLayout = async () => {
       try {
-        const r = await fetch(`${FIREBASE_URL}/slot_layout.json`);
+        const r = await fetch(`${FIREBASE_URL}/${path}_layout.json`);
         if (!r.ok) return;
         const layout = await r.json();
         if (layout && typeof layout === 'object') layoutRef.current = layout;
@@ -36,7 +41,7 @@ export function useFirebaseSlots() {
     loadLayout();
     const iv = setInterval(loadLayout, 10_000);
     return () => clearInterval(iv);
-  }, []);
+  }, [path]);
 
   // Poll /settings.json every 5 s to pick up admin-controlled UI flags.
   useEffect(() => {
@@ -68,7 +73,7 @@ export function useFirebaseSlots() {
 
     const poll = async () => {
       try {
-        const r = await fetch(`${FIREBASE_URL}/parking.json`);
+        const r = await fetch(`${FIREBASE_URL}/${path}.json`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
 
@@ -125,7 +130,7 @@ export function useFirebaseSlots() {
 
     poll();
     return () => { if (timerId) clearTimeout(timerId); };
-  }, []);
+  }, [path]);
 
   // Clear justChanged flags after the pulse animation completes (500 ms).
   useEffect(() => {
