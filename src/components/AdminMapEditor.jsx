@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { saveMapPin, deleteMapPin } from '../utils/firebase';
+import { saveMapPin, deleteMapPin, setPiActivePin, clearPiActivePin } from '../utils/firebase';
 
 const FIREBASE_URL  = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
 const DEFAULT_CENTER = [10.294756867999133, 123.8805492386066];
@@ -48,8 +48,11 @@ export default function AdminMapEditor() {
   const [saving,         setSaving]         = useState(false);
   const [msg,            setMsg]            = useState(null);
   const [loading,        setLoading]        = useState(true);
+  const [activePinCode,  setActivePinCode]  = useState(null);
+  const [assignTarget,   setAssignTarget]   = useState('');
+  const [assigning,      setAssigning]      = useState(false);
 
-  // Load existing pins from Firebase on mount
+  // Load existing pins and active Pi assignment from Firebase on mount
   useEffect(() => {
     fetch(`${FIREBASE_URL}/map_pins.json`)
       .then(r => r.json())
@@ -60,6 +63,11 @@ export default function AdminMapEditor() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    fetch(`${FIREBASE_URL}/pi_config/active_pin.json`)
+      .then(r => r.json())
+      .then(data => { if (typeof data === 'string') setActivePinCode(data); })
+      .catch(() => {});
   }, []);
 
   // Init Leaflet map
@@ -151,6 +159,34 @@ export default function AdminMapEditor() {
   function showMsg(text, ok = true) {
     setMsg({ text, ok });
     setTimeout(() => setMsg(null), 5000);
+  }
+
+  async function handleAssignPi() {
+    if (!assignTarget) return;
+    setAssigning(true);
+    try {
+      await setPiActivePin(assignTarget);
+      setActivePinCode(assignTarget);
+      showMsg(`Pi assigned to ${assignTarget}.`);
+    } catch (e) {
+      showMsg(`Assign failed: ${e.message}`, false);
+    } finally {
+      setAssigning(false);
+    }
+  }
+
+  async function handleClearAssignment() {
+    setAssigning(true);
+    try {
+      await clearPiActivePin();
+      setActivePinCode(null);
+      setAssignTarget('');
+      showMsg('Manual override cleared — Pi will use its local PIN_CODE.');
+    } catch (e) {
+      showMsg(`Clear failed: ${e.message}`, false);
+    } finally {
+      setAssigning(false);
+    }
   }
 
   async function handleSavePin() {
@@ -299,6 +335,75 @@ export default function AdminMapEditor() {
 
       <Card style={{ padding: 16 }}>
         <div style={{ fontFamily: C.sans, fontWeight: 700, fontSize: 13, marginBottom: 12 }}>
+          Pi Assignment
+          <span style={{ fontFamily: C.mono, fontSize: 10, color: C.muted, marginLeft: 8 }}>
+            — which pin code the Raspberry Pi is automapping to
+          </span>
+        </div>
+
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 12,
+          padding: '4px 10px', borderRadius: 6,
+          background: activePinCode ? `${C.vac}15` : `${C.accent}10`,
+          border: `1px solid ${activePinCode ? C.vac + '44' : C.border}`,
+        }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: activePinCode ? C.vac : C.muted,
+            display: 'inline-block',
+          }} />
+          <span style={{ fontFamily: C.mono, fontSize: 11, color: activePinCode ? C.vac : C.muted }}>
+            {activePinCode ? `Manual Override → ${activePinCode}` : 'Auto — Pi using its local PIN_CODE'}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select
+            value={assignTarget}
+            onChange={e => setAssignTarget(e.target.value)}
+            style={{
+              background: '#0f172a', border: `1px solid ${C.border}`, color: C.text,
+              borderRadius: 8, padding: '7px 10px', fontFamily: C.mono, fontSize: 12, flex: 1,
+            }}
+          >
+            <option value="">— Select pin code —</option>
+            {pins.map(p => (
+              <option key={p.pinCode} value={p.pinCode}>
+                {p.pinCode} — {p.name}{p.pinCode === activePinCode ? ' ✓' : ''}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleAssignPi}
+            disabled={assigning || !assignTarget || assignTarget === activePinCode}
+            style={{
+              padding: '7px 16px', borderRadius: 8,
+              border: `1px solid ${C.accent}44`, background: `${C.accent}12`, color: C.accent,
+              fontFamily: C.mono, fontSize: 12, fontWeight: 700,
+              cursor: assigning || !assignTarget || assignTarget === activePinCode ? 'not-allowed' : 'pointer',
+              opacity: assigning ? 0.6 : 1,
+            }}
+          >
+            {assigning ? '…' : 'Assign Pi'}
+          </button>
+          {activePinCode && (
+            <button
+              onClick={handleClearAssignment}
+              disabled={assigning}
+              style={{
+                padding: '7px 14px', borderRadius: 8,
+                border: `1px solid ${C.occ}44`, background: `${C.occ}10`, color: C.occ,
+                fontFamily: C.mono, fontSize: 12, cursor: assigning ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Clear Override
+            </button>
+          )}
+        </div>
+      </Card>
+
+      <Card style={{ padding: 16 }}>
+        <div style={{ fontFamily: C.sans, fontWeight: 700, fontSize: 13, marginBottom: 12 }}>
           Saved Pins {loading ? '…' : `(${pins.length})`}
         </div>
         {pins.length === 0 ? (
@@ -318,7 +423,9 @@ export default function AdminMapEditor() {
               <tbody>
                 {pins.map(pin => (
                   <tr key={pin.pinCode} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ padding: '8px 10px', color: C.accent, fontWeight: 700 }}>{pin.pinCode}</td>
+                    <td style={{ padding: '8px 10px', color: pin.pinCode === activePinCode ? C.vac : C.accent, fontWeight: 700 }}>
+                      {pin.pinCode}{pin.pinCode === activePinCode ? ' ●' : ''}
+                    </td>
                     <td style={{ padding: '8px 10px', color: C.text }}>{pin.name}</td>
                     <td style={{ padding: '8px 10px', color: C.muted }}>{pin.lat.toFixed(6)}</td>
                     <td style={{ padding: '8px 10px', color: C.muted }}>{pin.lng.toFixed(6)}</td>

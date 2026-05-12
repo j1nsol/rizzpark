@@ -115,5 +115,13 @@ export async function deleteMapPin(pinCode) {
 }
 
 export async function savePinSlotLayout(pinCode, slotId, coords, row) {
-  await set(ref(db, `pin_slot_layouts/${pinCode}/${slotId}`), { coords, row: row ?? null });
+  await set(ref(db, `locations/${pinCode}/layout/${slotId}`), { coords, row: row ?? null });
+}
+
+export async function setPiActivePin(pinCode) {
+  await set(ref(db, 'pi_config/active_pin'), pinCode);
+}
+
+export async function clearPiActivePin() {
+  await remove(ref(db, 'pi_config/active_pin'));
 }

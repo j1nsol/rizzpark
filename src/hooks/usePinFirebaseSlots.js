@@ -18,7 +18,7 @@ export function usePinFirebaseSlots(pinCode) {
   useEffect(() => {
     const load = async () => {
       try {
-        const r = await fetch(`${FIREBASE_URL}/pin_slot_layouts/${pinCode}.json`);
+        const r = await fetch(`${FIREBASE_URL}/locations/${pinCode}/layout.json`);
         if (!r.ok) return;
         const layout = await r.json();
         if (layout && typeof layout === 'object') layoutRef.current = layout;
@@ -52,7 +52,7 @@ export function usePinFirebaseSlots(pinCode) {
 
     const poll = async () => {
       try {
-        const r = await fetch(`${FIREBASE_URL}/parking_locations/${pinCode}/slots.json`);
+        const r = await fetch(`${FIREBASE_URL}/locations/${pinCode}/slots.json`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
 

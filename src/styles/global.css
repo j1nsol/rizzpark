@@ -491,7 +491,7 @@ select.twk-field{padding-right:22px;
   user-select:none;padding-right:8px}
 .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
   font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
-  outline:none;color:inherit;-moz-appearance:textfield}
+  outline:none;color:inherit;-moz-appearance:textfield;appearance:textfield}
 .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
   -webkit-appearance:none;margin:0}
 .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}

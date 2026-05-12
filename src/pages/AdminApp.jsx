@@ -18,28 +18,27 @@ const STREAM_FPS_DISPLAY = 15; // must match STREAM_FPS in flask_api.py
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GLOBAL_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-  body { background:#070a10; }
-  ::-webkit-scrollbar{width:4px;height:4px}
+  body { background:#F5F4F1; font-family:'DM Sans',sans-serif; color:#111; }
+  ::-webkit-scrollbar{width:6px;height:6px}
   ::-webkit-scrollbar-track{background:transparent}
-  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:2px}
+  ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:3px}
   @keyframes fadeUp  {from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
   @keyframes slideIn {from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
   @keyframes blink   {0%,100%{opacity:1}50%{opacity:0}}
-  @keyframes pulse   {0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,.4)}50%{opacity:.7;box-shadow:0 0 0 7px rgba(16,185,129,0)}}
+  @keyframes pulse   {0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,160,107,.4)}50%{opacity:.7;box-shadow:0 0 0 7px rgba(34,160,107,0)}}
   @keyframes scanline{0%{top:-10%}100%{top:110%}}
   @keyframes shake   {0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
   @keyframes spin    {to{transform:rotate(360deg)}}
-  @keyframes dropzone{0%,100%{border-color:rgba(56,189,248,.3)}50%{border-color:rgba(56,189,248,.8)}}
+  @keyframes dropzone{0%,100%{border-color:rgba(245,166,35,.3)}50%{border-color:rgba(245,166,35,.8)}}
 `;
 
 const C = {
-  bg:"#070a10", surface:"#0d1018", card:"#111520",
-  border:"rgba(255,255,255,0.07)",
-  occ:"#f43f5e", vac:"#10b981", accent:"#38bdf8", warn:"#f59e0b", purple:"#a78bfa",
-  text:"#e2e8f0", muted:"rgba(226,232,240,0.38)",
-  mono:"'JetBrains Mono',monospace", sans:"'Syne',sans-serif",
+  bg:"#F5F4F1", surface:"#FFFFFF", card:"#FFFFFF",
+  border:"#E4E1DA",
+  occ:"#D93A3A", vac:"#22A06B", accent:"#F5A623", warn:"#f59e0b", purple:"#7c3aed",
+  text:"#111111", muted:"#888888",
+  mono:"'DM Sans',sans-serif", sans:"'DM Sans',sans-serif",
 };
 
 const pct   = (a,b) => b ? Math.round((a/b)*100) : 0;
@@ -85,14 +84,14 @@ function Badge({label,color}){
   return <span style={{padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:700,fontFamily:C.mono,letterSpacing:"0.06em",textTransform:"uppercase",background:`${color}22`,color,border:`1px solid ${color}44`}}>{label}</span>;
 }
 function Card({children,style={}}){
-  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,...style}}>{children}</div>;
+  return <div style={{background:C.card,border:`1.5px solid ${C.border}`,borderRadius:12,boxShadow:"0 1px 3px rgba(0,0,0,.06)",...style}}>{children}</div>;
 }
 function StatPill({label,value,color,sub}){
   return(
-    <div style={{flex:1,minWidth:110,padding:"18px 20px",background:C.card,border:`1px solid ${C.border}`,borderRadius:14,position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",inset:0,opacity:.07,background:`radial-gradient(circle at 80% 20%,${color},transparent 70%)`}}/>
-      <div style={{fontSize:30,fontWeight:800,fontFamily:C.sans,color,lineHeight:1}}>{value}</div>
-      <div style={{fontSize:11,fontFamily:C.mono,color:C.muted,marginTop:5,textTransform:"uppercase",letterSpacing:"0.08em"}}>{label}</div>
+    <div style={{flex:1,minWidth:110,padding:"14px 16px",background:C.card,border:`1.5px solid ${C.border}`,borderRadius:10,position:"relative",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+      <div style={{position:"absolute",inset:0,opacity:.06,background:`radial-gradient(circle at 80% 20%,${color},transparent 70%)`}}/>
+      <div style={{fontSize:28,fontWeight:700,fontFamily:C.sans,color,lineHeight:1}}>{value}</div>
+      <div style={{fontSize:11,fontFamily:C.mono,color:C.muted,marginTop:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>{label}</div>
       {sub&&<div style={{fontSize:10,color,marginTop:2,fontFamily:C.mono}}>{sub}</div>}
     </div>
   );
@@ -123,6 +122,57 @@ function ConnectionBanner({piStatus,firebaseStatus}){
   );
 }
 
+// ── Pi Selector ───────────────────────────────────────────────────────────────
+function PiSelector({ piRegistry, selectedPiCode, onSelect }) {
+  const now = Date.now();
+  const pis = Object.values(piRegistry);
+  if (!pis.length) return null;
+
+  return (
+    <div style={{
+      display:"flex", alignItems:"center", gap:8, flexWrap:"wrap",
+      padding:"10px 14px", background:C.surface,
+      border:`1px solid ${C.border}`, borderRadius:12,
+    }}>
+      <span style={{fontFamily:C.mono,fontSize:10,color:C.muted,whiteSpace:"nowrap",flexShrink:0}}>
+        Pi:
+      </span>
+      {pis.map(pi => {
+        const online = (now - pi.lastSeen) < 30000;
+        const sel    = pi.pinCode === selectedPiCode;
+        return (
+          <button key={pi.pinCode} onClick={() => onSelect(sel ? null : pi.pinCode)}
+            style={{
+              display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:8,
+              border:`1px solid ${sel ? C.accent+"66" : online ? C.vac+"33" : C.border}`,
+              background: sel ? `${C.accent}18` : online ? `${C.vac}08` : "transparent",
+              color: sel ? C.accent : online ? C.text : C.muted,
+              fontFamily:C.mono, fontSize:11, fontWeight: sel ? 700 : 400,
+              cursor:"pointer", transition:"all .15s",
+            }}>
+            <span style={{
+              width:6, height:6, borderRadius:"50%", flexShrink:0,
+              background: online ? C.vac : "rgba(0,0,0,.1)",
+              boxShadow: online ? `0 0 5px ${C.vac}88` : "none",
+            }}/>
+            {pi.pinCode}
+            {pi.ztIp && (
+              <span style={{color: sel ? C.accent+"99" : C.muted, fontSize:9}}>
+                · {pi.ztIp}
+              </span>
+            )}
+          </button>
+        );
+      })}
+      <span style={{fontFamily:C.mono,fontSize:9,color:C.muted,marginLeft:2}}>
+        {selectedPiCode && piRegistry[selectedPiCode]
+          ? `→ ${piRegistry[selectedPiCode].apiUrl}`
+          : `no Pi selected — using ${PI_API_URL}`}
+      </span>
+    </div>
+  );
+}
+
 // ── Parking Map SVG ───────────────────────────────────────────────────────────
 // Fix #6: renders quads as <polygon> and rects as <rect> correctly
 function ParkingMap({slots,selectedSlot,onSelect,adminMode,onRemove}){
@@ -138,10 +188,10 @@ function ParkingMap({slots,selectedSlot,onSelect,adminMode,onRemove}){
   return(
     <div style={{width:"100%",overflowX:"auto"}}>
       <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{width:"100%",minWidth:320,display:"block"}}>
-        <rect width={SVG_W} height={SVG_H} rx="14" fill="#080c15"/>
+        <rect width={SVG_W} height={SVG_H} rx="14" fill="#EDEBE4"/>
         <defs>
           <pattern id="g" width="30" height="30" patternUnits="userSpaceOnUse">
-            <path d="M30 0L0 0 0 30" fill="none" stroke="rgba(255,255,255,.03)" strokeWidth=".5"/>
+            <path d="M30 0L0 0 0 30" fill="none" stroke="rgba(0,0,0,.07)" strokeWidth=".5"/>
           </pattern>
           <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
@@ -175,8 +225,8 @@ function ParkingMap({slots,selectedSlot,onSelect,adminMode,onRemove}){
               )}
               {occ&&<text x={cx} y={cy+2} textAnchor="middle" fontSize="12" style={{userSelect:"none"}}>🚗</text>}
               {!occ&&<circle cx={cx} cy={cy-4} r="5" fill={C.vac} opacity=".35"/>}
-              <text x={cx} y={y2-4} textAnchor="middle" fill={occ?"#fda4af":"#6ee7b7"} fontSize="8" fontFamily={C.mono} fontWeight="700">{id}</text>
-              <rect x={x1+2} y={y2-4} width={w-4} height={2} rx="1" fill="rgba(255,255,255,.08)"/>
+              <text x={cx} y={y2-4} textAnchor="middle" fill={occ?"#D93A3A":"#22A06B"} fontSize="8" fontFamily={C.mono} fontWeight="700">{id}</text>
+              <rect x={x1+2} y={y2-4} width={w-4} height={2} rx="1" fill="rgba(0,0,0,.1)"/>
               <rect x={x1+2} y={y2-4} width={(w-4)*(slot.confidence||.8)} height={2} rx="1" fill={occ?C.occ:C.vac} opacity=".65"/>
               {adminMode&&sel&&(
                 <g onClick={e=>{e.stopPropagation();onRemove(id);}}>
@@ -281,7 +331,7 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
         {[["camera","📹 Camera"],["video","🎬 Video File"]].map(([src,label])=>(
           <button key={src} onClick={()=>setVideoSource(src)}
             style={{padding:"5px 14px",borderRadius:8,
-              border:`1px solid ${videoSource===src?C.accent+"55":"rgba(255,255,255,.1)"}`,
+              border:`1px solid ${videoSource===src?C.accent+"55":"rgba(0,0,0,.08)"}`,
               background:videoSource===src?`${C.accent}15`:"transparent",
               color:videoSource===src?C.accent:C.muted,
               fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all .15s"}}>
@@ -293,11 +343,11 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
       {/* ── Video file controls ──────────────────────────────────────── */}
       {videoSource==="video" && (
         <div style={{display:"flex",flexDirection:"column",gap:10,padding:"12px 14px",
-          borderRadius:10,background:"rgba(56,189,248,.06)",border:`1px solid rgba(56,189,248,.2)`}}>
+          borderRadius:10,background:"rgba(245,166,35,.07)",border:`1px solid rgba(245,166,35,.25)`}}>
           {/* File picker */}
           <label style={{cursor:"pointer",fontFamily:C.mono,fontSize:11,color:C.muted,
-            padding:"8px 12px",borderRadius:8,border:`1px dashed rgba(56,189,248,.35)`,
-            background:"rgba(56,189,248,.04)",textAlign:"center"}}>
+            padding:"8px 12px",borderRadius:8,border:`1px dashed rgba(245,166,35,.4)`,
+            background:"rgba(245,166,35,.05)",textAlign:"center"}}>
             {videoFile ? videoFile.name : "📂 Click to select video (.mp4 .avi .mov)"}
             <input type="file" accept="video/*" style={{display:"none"}}
               onChange={e => { setVideoFile(e.target.files[0]); setPlayState("stopped"); setProgress(null); }}/>
@@ -348,7 +398,7 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
               <div style={{marginBottom:4}}>
                 Frame {progress.frame} / {progress.total} · {Math.round(progress.frame/progress.total*100)}% · {progress.fps} FPS
               </div>
-              <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,.08)"}}>
+              <div style={{height:3,borderRadius:2,background:"rgba(0,0,0,.06)"}}>
                 <div style={{height:"100%",borderRadius:2,background:C.vac,
                   width:`${Math.round(progress.frame/progress.total*100)}%`,transition:"width .5s"}}/>
               </div>
@@ -358,7 +408,7 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
       )}
 
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
-        <div style={{padding:"10px 16px",background:`linear-gradient(135deg,rgba(56,189,248,.1),rgba(99,102,241,.06))`,border:`1px solid rgba(56,189,248,.25)`,borderRadius:12,display:"flex",alignItems:"center",gap:10}}>
+        <div style={{padding:"10px 16px",background:`linear-gradient(135deg,rgba(245,166,35,.1),rgba(124,58,237,.06))`,border:`1px solid rgba(245,166,35,.3)`,borderRadius:12,display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:20}}>📹</span>
           <div>
             <div style={{fontFamily:C.sans,fontWeight:800,fontSize:14,color:C.accent}}>Live Camera Feed</div>
@@ -368,7 +418,7 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {!piOffline && !error && loaded &&(
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderRadius:8,
-              background:"rgba(16,185,129,.1)",border:`1px solid ${C.vac}33`,
+              background:"rgba(34,160,107,.1)",border:`1px solid ${C.vac}33`,
               fontFamily:C.mono,fontSize:10,color:C.vac}}>
               <LiveDot color={C.vac} size={6}/>
               {active ? `Live · ~${fps} FPS` : "Paused"}
@@ -395,11 +445,11 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
       </div>
 
       <div style={{position:"relative",borderRadius:14,overflow:"hidden",
-        background:"#04060d",border:`1px solid ${C.border}`,minHeight:300}}>
+        background:"#F0EEE8",border:`1.5px solid ${C.border}`,minHeight:300}}>
         {!loaded && !piOffline && !error && active &&(
           <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",
             alignItems:"center",justifyContent:"center",gap:12}}>
-            <div style={{width:32,height:32,border:`3px solid rgba(56,189,248,.2)`,
+            <div style={{width:32,height:32,border:`3px solid rgba(245,166,35,.25)`,
               borderTopColor:C.accent,borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
             <div style={{fontFamily:C.mono,fontSize:11,color:C.muted}}>Connecting to stream...</div>
           </div>
@@ -440,7 +490,7 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
         />
         {loaded && active &&(
           <div style={{position:"absolute",bottom:10,right:12,
-            background:"rgba(7,10,16,.8)",border:`1px solid ${C.border}`,
+            background:"rgba(255,255,255,.95)",border:`1px solid ${C.border}`,
             borderRadius:6,padding:"4px 10px",
             fontFamily:C.mono,fontSize:9,color:C.muted}}>
             {fmtTs()} · LIVE MJPEG
@@ -449,7 +499,7 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
       </div>
 
       <div style={{padding:"10px 14px",borderRadius:10,
-        background:"rgba(56,189,248,.06)",border:`1px solid rgba(56,189,248,.15)`,
+        background:"rgba(245,166,35,.07)",border:`1px solid rgba(245,166,35,.2)`,
         fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.7}}>
         ℹ️ Stream runs at ~{STREAM_FPS_DISPLAY} FPS. YOLO detections update every 1s — boxes stay visible between inferences. Pause to reduce Pi CPU load.
       </div>
@@ -462,9 +512,9 @@ function AITerminal({logs}){
   const ref=useRef(null);
   useEffect(()=>{ref.current?.scrollIntoView({behavior:"smooth"});},[logs]);
   return(
-    <div style={{background:"#04060d",border:`1px solid rgba(56,189,248,.2)`,borderRadius:12,padding:"14px 16px",height:260,overflowY:"auto",fontFamily:C.mono,fontSize:11,position:"relative"}}>
-      <div style={{position:"absolute",left:0,right:0,height:"2px",background:"linear-gradient(90deg,transparent,rgba(56,189,248,.15),transparent)",animation:"scanline 4s linear infinite",pointerEvents:"none"}}/>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:8,borderBottom:`1px solid rgba(255,255,255,.05)`}}>
+    <div style={{background:"#F0EEE8",border:`1.5px solid ${C.border}`,borderRadius:12,padding:"14px 16px",height:260,overflowY:"auto",fontFamily:C.mono,fontSize:11,position:"relative"}}>
+      <div style={{position:"absolute",left:0,right:0,height:"2px",background:"linear-gradient(90deg,transparent,rgba(245,166,35,.2),transparent)",animation:"scanline 4s linear infinite",pointerEvents:"none"}}/>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:8,borderBottom:`1px solid rgba(0,0,0,.05)`}}>
         <LiveDot color={C.accent}/>
         <span style={{color:C.accent,fontWeight:700,letterSpacing:"0.1em",fontSize:10}}>AI PROCESSING FEED</span>
         <span style={{marginLeft:"auto",color:C.muted,fontSize:10}}>{logs.length} events</span>
@@ -472,7 +522,7 @@ function AITerminal({logs}){
       {logs.length===0&&<div style={{color:C.muted,fontSize:11,textAlign:"center",marginTop:40}}>Waiting for system connection...</div>}
       {logs.map((l,i)=>(
         <div key={l.id} style={{padding:"2px 0",color:l.type==="error"?C.occ:l.type==="sync"?C.vac:l.type==="sys"?C.warn:l.type==="img"?C.purple:"rgba(148,163,184,.85)",animation:i===logs.length-1?"fadeUp .25s ease":"none",display:"flex",gap:10}}>
-          <span style={{color:"rgba(255,255,255,.18)",flexShrink:0}}>{l.time}</span>
+          <span style={{color:"rgba(0,0,0,.35)",flexShrink:0}}>{l.time}</span>
           <span>{l.msg}</span>
         </div>
       ))}
@@ -492,7 +542,7 @@ function ConfirmDialog({slotId,onConfirm,onCancel}){
           This removes <strong style={{color:C.text}}>{slotId}</strong> from the map. Re-run auto-mapping to restore.
         </div>
         <div style={{display:"flex",gap:12}}>
-          <button onClick={onCancel} style={{flex:1,padding:"12px",borderRadius:10,fontFamily:C.sans,fontWeight:600,fontSize:14,cursor:"pointer",background:"rgba(255,255,255,.06)",border:`1px solid ${C.border}`,color:C.text}}>Cancel</button>
+          <button onClick={onCancel} style={{flex:1,padding:"12px",borderRadius:10,fontFamily:C.sans,fontWeight:600,fontSize:14,cursor:"pointer",background:"rgba(0,0,0,.05)",border:`1px solid ${C.border}`,color:C.text}}>Cancel</button>
           <button onClick={onConfirm} style={{flex:1,padding:"12px",borderRadius:10,fontFamily:C.sans,fontWeight:700,fontSize:14,cursor:"pointer",background:C.occ,border:"none",color:"#fff",animation:"shake .4s ease"}}>Remove</button>
         </div>
       </div>
@@ -509,7 +559,7 @@ function SlotDetail({slotId,slot,onClose,onRemove,adminMode}){
     ? `Quad [${slot.coords.map(p=>p.join(",")).join(" | ")}]`
     : `[${(slot.coords||[]).join(",")}]`;
   return(
-    <div style={{background:"rgba(255,255,255,.03)",border:`1px solid ${occ?C.occ+"44":C.vac+"44"}`,borderRadius:14,padding:18,marginTop:14,animation:"slideIn .25s ease"}}>
+    <div style={{background:"rgba(0,0,0,.03)",border:`1px solid ${occ?C.occ+"44":C.vac+"44"}`,borderRadius:14,padding:18,marginTop:14,animation:"slideIn .25s ease"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontFamily:C.sans,fontWeight:800,fontSize:20,color:occ?C.occ:C.vac}}>Slot {slotId}</span>
@@ -546,7 +596,7 @@ function ImageResultsPage({result,image,onBack,onApplyToMap}){
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18,animation:"fadeUp .35s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,border:`1px solid ${C.border}`,background:"rgba(255,255,255,.04)",color:C.muted,fontFamily:C.mono,fontSize:12,cursor:"pointer"}}>← Back</button>
+        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,border:`1px solid ${C.border}`,background:"rgba(0,0,0,.04)",color:C.muted,fontFamily:C.mono,fontSize:12,cursor:"pointer"}}>← Back</button>
         <div>
           <div style={{fontFamily:C.sans,fontWeight:800,fontSize:18,color:C.text}}>YOLO Detection Results</div>
           <div style={{fontSize:11,fontFamily:C.mono,color:C.muted,marginTop:2}}>
@@ -566,10 +616,10 @@ function ImageResultsPage({result,image,onBack,onApplyToMap}){
         <div style={{fontFamily:C.sans,fontWeight:700,fontSize:13,marginBottom:12,color:C.muted}}>Analyzed Image</div>
         <div style={{position:"relative",display:"inline-block",width:"100%"}}>
           <img src={image} alt="analyzed" style={{width:"100%",borderRadius:10,display:"block",border:`1px solid ${C.border}`}}/>
-          <div style={{position:"absolute",top:10,left:10,background:"rgba(7,10,16,.85)",border:`1px solid ${C.accent}44`,borderRadius:8,padding:"6px 12px",fontFamily:C.mono,fontSize:11,color:C.accent}}>
+          <div style={{position:"absolute",top:10,left:10,background:"rgba(255,255,255,.92)",border:`1px solid ${C.accent}44`,borderRadius:8,padding:"6px 12px",fontFamily:C.mono,fontSize:11,color:C.accent}}>
             🚗 {result.vehicles_detected} vehicles detected
           </div>
-          <div style={{position:"absolute",top:10,right:10,background:"rgba(7,10,16,.85)",border:`1px solid ${C.vac}44`,borderRadius:8,padding:"6px 12px",fontFamily:C.mono,fontSize:11,color:C.vac}}>YOLOv8n ✓</div>
+          <div style={{position:"absolute",top:10,right:10,background:"rgba(255,255,255,.92)",border:`1px solid ${C.vac}44`,borderRadius:8,padding:"6px 12px",fontFamily:C.mono,fontSize:11,color:C.vac}}>YOLOv8n ✓</div>
         </div>
       </Card>
 
@@ -585,7 +635,7 @@ function ImageResultsPage({result,image,onBack,onApplyToMap}){
           <span style={{fontFamily:C.sans,fontWeight:600,fontSize:13,color:C.muted}}>Occupancy Rate</span>
           <span style={{fontFamily:C.mono,fontWeight:700,fontSize:13,color:p>75?C.occ:p>50?C.warn:C.vac}}>{p}%</span>
         </div>
-        <div style={{height:12,background:"rgba(255,255,255,.07)",borderRadius:6,overflow:"hidden"}}>
+        <div style={{height:12,background:"rgba(0,0,0,.08)",borderRadius:6,overflow:"hidden"}}>
           <div style={{height:"100%",width:`${p}%`,background:p>75?`linear-gradient(90deg,${C.occ},#dc2626)`:p>50?`linear-gradient(90deg,${C.warn},#d97706)`:`linear-gradient(90deg,${C.vac},#059669)`,borderRadius:6,transition:"width 1s ease"}}/>
         </div>
       </Card>
@@ -604,9 +654,9 @@ function ImageResultsPage({result,image,onBack,onApplyToMap}){
               const occ=s.status==="Occupied", sel=selected===s.id;
               return(
                 <div key={s.id} onClick={()=>setSelected(sel?null:s.id)}
-                  style={{padding:"14px 12px",borderRadius:12,cursor:"pointer",background:sel?(occ?`${C.occ}22`:`${C.vac}22`):"rgba(255,255,255,.03)",border:`1.5px solid ${sel?(occ?C.occ:C.vac):(occ?C.occ+"33":C.vac+"22")}`,transition:"all .2s",animation:`fadeUp .3s ease ${i*0.04}s both`}}>
+                  style={{padding:"14px 12px",borderRadius:12,cursor:"pointer",background:sel?(occ?`${C.occ}22`:`${C.vac}22`):"rgba(0,0,0,.03)",border:`1.5px solid ${sel?(occ?C.occ:C.vac):(occ?C.occ+"33":C.vac+"22")}`,transition:"all .2s",animation:`fadeUp .3s ease ${i*0.04}s both`}}>
                   <div style={{fontSize:22,marginBottom:8,textAlign:"center"}}>{occ?"🚗":"🟢"}</div>
-                  <div style={{fontFamily:C.mono,fontWeight:700,fontSize:13,color:occ?"#fda4af":"#6ee7b7",textAlign:"center",marginBottom:6}}>{s.id}</div>
+                  <div style={{fontFamily:C.mono,fontWeight:700,fontSize:13,color:occ?"#D93A3A":"#22A06B",textAlign:"center",marginBottom:6}}>{s.id}</div>
                   <div style={{textAlign:"center",marginBottom:8}}>
                     <span style={{fontSize:9,fontWeight:700,fontFamily:C.mono,letterSpacing:"0.06em",textTransform:"uppercase",padding:"2px 8px",borderRadius:4,background:`${occ?C.occ:C.vac}22`,color:occ?C.occ:C.vac,border:`1px solid ${occ?C.occ:C.vac}44`}}>{s.status}</span>
                   </div>
@@ -618,7 +668,7 @@ function ImageResultsPage({result,image,onBack,onApplyToMap}){
                       <span style={{color:C.muted}}>Conf</span><span style={{color:occ?C.occ:C.vac}}>{Math.round((s.confidence||.8)*100)}%</span>
                     </div>
                   </div>
-                  <div style={{height:3,background:"rgba(255,255,255,.07)",borderRadius:2,marginTop:8,overflow:"hidden"}}>
+                  <div style={{height:3,background:"rgba(0,0,0,.08)",borderRadius:2,marginTop:8,overflow:"hidden"}}>
                     <div style={{height:"100%",width:`${Math.round((s.confidence||.8)*100)}%`,background:occ?C.occ:C.vac,borderRadius:2}}/>
                   </div>
                 </div>
@@ -626,7 +676,7 @@ function ImageResultsPage({result,image,onBack,onApplyToMap}){
             })}
           </div>
           {slot&&(
-            <div style={{padding:18,borderRadius:14,background:"rgba(255,255,255,.03)",border:`1px solid ${slot.status==="Occupied"?C.occ+"44":C.vac+"44"}`,animation:"slideIn .2s ease"}}>
+            <div style={{padding:18,borderRadius:14,background:"rgba(0,0,0,.03)",border:`1px solid ${slot.status==="Occupied"?C.occ+"44":C.vac+"44"}`,animation:"slideIn .2s ease"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <span style={{fontFamily:C.sans,fontWeight:800,fontSize:18,color:slot.status==="Occupied"?C.occ:C.vac}}>Slot {slot.id}</span>
@@ -648,7 +698,7 @@ function ImageResultsPage({result,image,onBack,onApplyToMap}){
       )}
 
       <div style={{display:"flex",gap:12}}>
-        <button onClick={onBack} style={{flex:1,padding:"13px",borderRadius:12,border:`1px solid ${C.border}`,background:"rgba(255,255,255,.04)",color:C.muted,fontFamily:C.sans,fontWeight:700,fontSize:13,cursor:"pointer"}}>← Analyze Another</button>
+        <button onClick={onBack} style={{flex:1,padding:"13px",borderRadius:12,border:`1px solid ${C.border}`,background:"rgba(0,0,0,.04)",color:C.muted,fontFamily:C.sans,fontWeight:700,fontSize:13,cursor:"pointer"}}>← Analyze Another</button>
         <button onClick={()=>onApplyToMap(result)} style={{flex:2,padding:"13px",borderRadius:12,border:"none",background:`linear-gradient(135deg,${C.purple},${C.accent})`,color:"#fff",fontFamily:C.sans,fontWeight:800,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>🗺️ Apply to Parking Map</button>
       </div>
     </div>
@@ -699,7 +749,7 @@ function ImageTestPanel({onAnalysisComplete,addLog,piStatus}){
   const piOffline = piStatus==="error";
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      <div style={{padding:"14px 18px",background:`linear-gradient(135deg,rgba(167,139,250,.1),rgba(56,189,248,.06))`,border:`1px solid rgba(167,139,250,.25)`,borderRadius:14,display:"flex",alignItems:"center",gap:12}}>
+      <div style={{padding:"14px 18px",background:`linear-gradient(135deg,rgba(124,58,237,.1),rgba(245,166,35,.07))`,border:`1px solid rgba(124,58,237,.25)`,borderRadius:14,display:"flex",alignItems:"center",gap:12}}>
         <span style={{fontSize:24}}>🖼️</span>
         <div>
           <div style={{fontFamily:C.sans,fontWeight:800,fontSize:15,color:C.purple}}>Image Testing Mode</div>
@@ -718,7 +768,7 @@ function ImageTestPanel({onAnalysisComplete,addLog,piStatus}){
       <div onDragOver={e=>{e.preventDefault();setDragOver(true)}} onDragLeave={()=>setDragOver(false)}
         onDrop={e=>{e.preventDefault();setDragOver(false);handleFile(e.dataTransfer.files[0]);}}
         onClick={()=>inputRef.current?.click()}
-        style={{border:`2px dashed ${dragOver?C.accent:"rgba(56,189,248,.3)"}`,borderRadius:16,padding:"28px 20px",textAlign:"center",cursor:"pointer",background:dragOver?"rgba(56,189,248,.06)":"rgba(255,255,255,.02)",transition:"all .2s"}}>
+        style={{border:`2px dashed ${dragOver?C.accent:"rgba(245,166,35,.35)"}`,borderRadius:16,padding:"28px 20px",textAlign:"center",cursor:"pointer",background:dragOver?"rgba(245,166,35,.07)":"rgba(0,0,0,.02)",transition:"all .2s"}}>
         <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
         {image?(
           <div>
@@ -736,7 +786,7 @@ function ImageTestPanel({onAnalysisComplete,addLog,piStatus}){
 
       {image&&(
         <button onClick={analyzeImage} disabled={analyzing||piOffline}
-          style={{padding:"14px",borderRadius:12,border:"none",cursor:analyzing||piOffline?"not-allowed":"pointer",fontFamily:C.sans,fontWeight:800,fontSize:15,background:analyzing?"rgba(167,139,250,.2)":piOffline?`${C.occ}33`:`linear-gradient(135deg,${C.purple},${C.accent})`,color:piOffline?C.occ:"#fff",display:"flex",alignItems:"center",justifyContent:"center",gap:10,opacity:analyzing?.7:1}}>
+          style={{padding:"14px",borderRadius:12,border:"none",cursor:analyzing||piOffline?"not-allowed":"pointer",fontFamily:C.sans,fontWeight:800,fontSize:15,background:analyzing?"rgba(124,58,237,.2)":piOffline?`${C.occ}33`:`linear-gradient(135deg,${C.purple},${C.accent})`,color:piOffline?C.occ:"#fff",display:"flex",alignItems:"center",justifyContent:"center",gap:10,opacity:analyzing?.7:1}}>
           {analyzing?<><span style={{width:18,height:18,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite",display:"inline-block"}}/>Running YOLO on Pi...</>:piOffline?"⚠️ Pi Offline":"🔍 Send to Pi & Analyze with YOLO"}
         </button>
       )}
@@ -871,7 +921,7 @@ function SlotEditorPanel({slots, piStatus, addLog}){
       ctx.strokeStyle = isSel ? "#38bdf8" : (isOcc ? "#ef4444" : "#22c55e");
       ctx.lineWidth   = isSel ? 2.5 : 1.5;
       ctx.stroke();
-      ctx.fillStyle   = isSel ? "rgba(56,189,248,0.12)" : (isOcc ? "rgba(239,68,68,0.08)" : "rgba(34,197,94,0.08)");
+      ctx.fillStyle   = isSel ? "rgba(245,166,35,0.12)" : (isOcc ? "rgba(239,68,68,0.08)" : "rgba(34,197,94,0.08)");
       ctx.fill();
 
       const cx = pts.reduce((s,p)=>s+p[0],0)/4;
@@ -1124,7 +1174,7 @@ function SlotEditorPanel({slots, piStatus, addLog}){
           </div>
           <button onClick={fetchFrame} disabled={piOffline}
             style={{padding:"7px 13px",borderRadius:8,border:`1px solid ${C.border}`,
-              background:"rgba(255,255,255,.05)",color:C.text,fontFamily:C.mono,fontSize:11,
+              background:"rgba(0,0,0,.05)",color:C.text,fontFamily:C.mono,fontSize:11,
               cursor:piOffline?"not-allowed":"pointer"}}>
             🔄 Refresh Frame
           </button>
@@ -1153,7 +1203,7 @@ function SlotEditorPanel({slots, piStatus, addLog}){
           )}
           <button onClick={saveAll} disabled={saving||piOffline}
             style={{padding:"7px 13px",borderRadius:8,border:"none",
-              background:piOffline?"rgba(255,255,255,.05)":isDirty?`linear-gradient(135deg,${C.warn},#d97706)`:`linear-gradient(135deg,#10b981,#059669)`,
+              background:piOffline?"rgba(0,0,0,.05)":isDirty?`linear-gradient(135deg,${C.warn},#d97706)`:`linear-gradient(135deg,#10b981,#059669)`,
               color:piOffline?C.muted:"#fff",fontFamily:C.mono,fontSize:11,fontWeight:700,
               cursor:saving||piOffline?"not-allowed":"pointer",opacity:saving?.7:1}}>
             {saving?"Saving...":"💾 Save All"}
@@ -1186,7 +1236,7 @@ function SlotEditorPanel({slots, piStatus, addLog}){
             </select>
             <button onClick={addSlot} disabled={!newSlotId.trim()||addingSlot||piOffline}
               style={{padding:"6px 14px",borderRadius:8,border:"none",
-                background:!newSlotId.trim()||piOffline?"rgba(255,255,255,.05)":`linear-gradient(135deg,${C.accent},${C.purple})`,
+                background:!newSlotId.trim()||piOffline?"rgba(0,0,0,.05)":`linear-gradient(135deg,${C.accent},${C.purple})`,
                 color:!newSlotId.trim()||piOffline?C.muted:"#fff",
                 fontFamily:C.mono,fontSize:11,fontWeight:700,
                 cursor:!newSlotId.trim()||addingSlot||piOffline?"not-allowed":"pointer"}}>
@@ -1241,8 +1291,8 @@ function SlotEditorPanel({slots, piStatus, addLog}){
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
             {editSlots[selected].quad.map((p,i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",gap:8,
-                padding:"8px 12px",borderRadius:8,background:"rgba(56,189,248,.06)",
-                border:`1px solid rgba(56,189,248,.15)`}}>
+                padding:"8px 12px",borderRadius:8,background:"rgba(245,166,35,.07)",
+                border:`1px solid rgba(245,166,35,.2)`}}>
                 <div style={{width:20,height:20,borderRadius:"50%",background:C.accent,
                   display:"flex",alignItems:"center",justifyContent:"center",
                   fontFamily:C.mono,fontSize:10,fontWeight:700,color:"#0f172a",flexShrink:0}}>
@@ -1262,8 +1312,8 @@ function SlotEditorPanel({slots, piStatus, addLog}){
         </Card>
       )}
 
-      <div style={{padding:"10px 14px",borderRadius:10,background:"rgba(56,189,248,.06)",
-        border:`1px solid rgba(56,189,248,.15)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
+      <div style={{padding:"10px 14px",borderRadius:10,background:"rgba(245,166,35,.07)",
+        border:`1px solid rgba(245,166,35,.2)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
         ℹ️ <strong style={{color:C.accent}}>How to use:</strong> Click a slot on the canvas or pick from the dropdown → blue corner handles appear → drag any corner to reposition → Save. Changes apply to the Pi immediately and persist across restarts.
         <br/>After a Remap, refresh this tab to load the new auto-mapped quads.
       </div>
@@ -1319,12 +1369,12 @@ function ProgramPropertiesPanel({piStatus, addLog}){
   const NumInput = ({val,min,max,step,onChange,unit=""})=>(
     <div style={{display:"flex",alignItems:"center",gap:6}}>
       <button onClick={()=>onChange(Math.max(min,parseFloat((val-step).toFixed(10))))}
-        disabled={piOffline} style={{width:28,height:28,borderRadius:6,border:`1px solid ${C.border}`,background:"rgba(255,255,255,.05)",color:C.text,cursor:piOffline?"not-allowed":"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-      <div style={{minWidth:64,textAlign:"center",fontFamily:C.mono,fontWeight:700,fontSize:14,color:C.accent,padding:"4px 8px",background:"rgba(56,189,248,.08)",borderRadius:6,border:`1px solid rgba(56,189,248,.2)`}}>
+        disabled={piOffline} style={{width:28,height:28,borderRadius:6,border:`1px solid ${C.border}`,background:"rgba(0,0,0,.05)",color:C.text,cursor:piOffline?"not-allowed":"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+      <div style={{minWidth:64,textAlign:"center",fontFamily:C.mono,fontWeight:700,fontSize:14,color:C.accent,padding:"4px 8px",background:"rgba(245,166,35,.1)",borderRadius:6,border:`1px solid rgba(245,166,35,.25)`}}>
         {val}{unit}
       </div>
       <button onClick={()=>onChange(Math.min(max,parseFloat((val+step).toFixed(10))))}
-        disabled={piOffline} style={{width:28,height:28,borderRadius:6,border:`1px solid ${C.border}`,background:"rgba(255,255,255,.05)",color:C.text,cursor:piOffline?"not-allowed":"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+        disabled={piOffline} style={{width:28,height:28,borderRadius:6,border:`1px solid ${C.border}`,background:"rgba(0,0,0,.05)",color:C.text,cursor:piOffline?"not-allowed":"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
     </div>
   );
 
@@ -1370,17 +1420,17 @@ function ProgramPropertiesPanel({piStatus, addLog}){
         </Row>
         <div style={{display:"flex",gap:10,marginTop:20}}>
           <button onClick={apply} disabled={saving||piOffline}
-            style={{flex:2,padding:"11px",borderRadius:10,border:"none",cursor:saving||piOffline?"not-allowed":"pointer",fontFamily:C.sans,fontWeight:700,fontSize:13,background:piOffline?`rgba(255,255,255,.05)`:`linear-gradient(135deg,${C.accent},${C.purple})`,color:piOffline?C.muted:"#fff",opacity:saving?.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            style={{flex:2,padding:"11px",borderRadius:10,border:"none",cursor:saving||piOffline?"not-allowed":"pointer",fontFamily:C.sans,fontWeight:700,fontSize:13,background:piOffline?`rgba(0,0,0,.05)`:`linear-gradient(135deg,${C.accent},${C.purple})`,color:piOffline?C.muted:"#fff",opacity:saving?.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
             {saving?<><span style={{width:14,height:14,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite",display:"inline-block"}}/>Saving...</>:"💾 Apply to Pi"}
           </button>
           <button onClick={reset} disabled={piOffline}
-            style={{flex:1,padding:"11px",borderRadius:10,border:`1px solid ${C.border}`,cursor:piOffline?"not-allowed":"pointer",fontFamily:C.sans,fontWeight:700,fontSize:13,background:"rgba(255,255,255,.03)",color:C.muted}}>
+            style={{flex:1,padding:"11px",borderRadius:10,border:`1px solid ${C.border}`,cursor:piOffline?"not-allowed":"pointer",fontFamily:C.sans,fontWeight:700,fontSize:13,background:"rgba(0,0,0,.03)",color:C.muted}}>
             ↺ Defaults
           </button>
         </div>
       </Card>
 
-      <div style={{padding:"10px 14px",borderRadius:10,background:"rgba(56,189,248,.06)",border:`1px solid rgba(56,189,248,.15)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
+      <div style={{padding:"10px 14px",borderRadius:10,background:"rgba(245,166,35,.07)",border:`1px solid rgba(245,166,35,.2)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
         ℹ️ Changes apply within 5 seconds without restarting. For fastest testing set <strong style={{color:C.text}}>Interval=0, YOLO Every=1</strong>. To reduce Pi CPU load raise Interval or YOLO Every N.
       </div>
     </div>
@@ -1502,8 +1552,8 @@ function DistortionPanel({piStatus, addLog}){
         disabled={piOffline||!cfg.enabled}
         style={{width:"100%",accentColor:C.accent,cursor:piOffline||!cfg.enabled?"not-allowed":"pointer",height:4}}/>
       <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
-        <span style={{fontFamily:C.mono,fontSize:9,color:"rgba(255,255,255,.2)"}}>{min}{unit}</span>
-        <span style={{fontFamily:C.mono,fontSize:9,color:"rgba(255,255,255,.2)"}}>{max}{unit}</span>
+        <span style={{fontFamily:C.mono,fontSize:9,color:"rgba(0,0,0,.3)"}}>{min}{unit}</span>
+        <span style={{fontFamily:C.mono,fontSize:9,color:"rgba(0,0,0,.3)"}}>{max}{unit}</span>
       </div>
     </div>
   );
@@ -1539,7 +1589,7 @@ function DistortionPanel({piStatus, addLog}){
               {calibrating?"Calibrating...":(cfg.enabled?"Enabled":"Disabled")}
             </span>
             <div style={{width:42,height:24,borderRadius:12,
-              background:calibrating?C.warn:cfg.enabled?C.vac:"rgba(255,255,255,.1)",
+              background:calibrating?C.warn:cfg.enabled?C.vac:"rgba(0,0,0,.08)",
               border:`1px solid ${calibrating?C.warn+"66":cfg.enabled?C.vac+"66":C.border}`,
               position:"relative",transition:"all .25s",opacity:busy?.6:1}}>
               {calibrating
@@ -1551,7 +1601,7 @@ function DistortionPanel({piStatus, addLog}){
         </div>
 
         <div style={{opacity:cfg.enabled?1:.4,transition:"opacity .3s"}}>
-          <div style={{fontFamily:C.mono,fontSize:10,color:C.muted,marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(255,255,255,.03)",border:`1px solid ${C.border}`}}>
+          <div style={{fontFamily:C.mono,fontSize:10,color:C.muted,marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(0,0,0,.03)",border:`1px solid ${C.border}`}}>
             💡 Values below are auto-calibrated. Fine-tune manually then click <strong style={{color:C.text}}>Apply</strong> if needed.
           </div>
           <Slider label="k1 — Primary radial distortion" value={cfg.k1} min={-0.8} max={0.0} step={0.05}
@@ -1567,7 +1617,7 @@ function DistortionPanel({piStatus, addLog}){
             style={{flex:1,padding:"11px",borderRadius:10,border:"none",
               cursor:busy||piOffline||!cfg.enabled?"not-allowed":"pointer",
               fontFamily:C.sans,fontWeight:700,fontSize:13,
-              background:piOffline||!cfg.enabled?`rgba(255,255,255,.05)`:`linear-gradient(135deg,${C.accent},${C.purple})`,
+              background:piOffline||!cfg.enabled?`rgba(0,0,0,.05)`:`linear-gradient(135deg,${C.accent},${C.purple})`,
               color:piOffline||!cfg.enabled?C.muted:"#fff",opacity:saving?.7:1,
               display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
             {saving?<><span style={{width:14,height:14,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin .8s linear infinite",display:"inline-block"}}/>Saving...</>:"💾 Apply Manual Tweaks"}
@@ -1575,7 +1625,7 @@ function DistortionPanel({piStatus, addLog}){
           <button onClick={fetchPreview} disabled={previewing||piOffline}
             style={{flex:1,padding:"11px",borderRadius:10,border:`1px solid ${piOffline?C.border:C.vac+"44"}`,
               cursor:previewing||piOffline?"not-allowed":"pointer",fontFamily:C.sans,fontWeight:700,fontSize:13,
-              background:piOffline?"rgba(255,255,255,.03)":`${C.vac}12`,color:piOffline?C.muted:C.vac,
+              background:piOffline?"rgba(0,0,0,.03)":`${C.vac}12`,color:piOffline?C.muted:C.vac,
               opacity:previewing?.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
             {previewing?<><span style={{width:14,height:14,border:`2px solid ${C.vac}44`,borderTopColor:C.vac,borderRadius:"50%",animation:"spin .8s linear infinite",display:"inline-block"}}/>Fetching...</>:"🔍 Preview"}
           </button>
@@ -1600,7 +1650,7 @@ function DistortionPanel({piStatus, addLog}){
         )}
       </Card>
 
-      <div style={{padding:"10px 14px",borderRadius:10,background:"rgba(56,189,248,.06)",border:`1px solid rgba(56,189,248,.15)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
+      <div style={{padding:"10px 14px",borderRadius:10,background:"rgba(245,166,35,.07)",border:`1px solid rgba(245,166,35,.2)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
         ℹ️ <strong style={{color:C.accent}}>How it works:</strong> Toggle ON → Pi analyses line straightness in the live frame → best k1/k2 values are found automatically and applied → sliders update to reflect the calibrated values. Toggle OFF → immediately resets and disables.
         <br/>For best results make sure the camera can see straight parking lot lines or edges before calibrating.
       </div>
@@ -1668,7 +1718,7 @@ function DriverUISettingsPanel(){
             {showSelectedBox?"Visible":"Hidden"}
           </span>
           <div style={{width:42,height:24,borderRadius:12,
-            background:showSelectedBox?C.vac:"rgba(255,255,255,.1)",
+            background:showSelectedBox?C.vac:"rgba(0,0,0,.08)",
             border:`1px solid ${showSelectedBox?C.vac+"66":C.border}`,
             position:"relative",transition:"all .25s",opacity:saving?.6:1}}>
             {saving
@@ -1678,7 +1728,7 @@ function DriverUISettingsPanel(){
           </div>
         </div>
       </div>
-      <div style={{marginTop:14,padding:"10px 14px",borderRadius:10,background:"rgba(56,189,248,.06)",border:`1px solid rgba(56,189,248,.15)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
+      <div style={{marginTop:14,padding:"10px 14px",borderRadius:10,background:"rgba(245,166,35,.07)",border:`1px solid rgba(245,166,35,.2)`,fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.8}}>
         ℹ️ The toggle syncs instantly to Firebase. The Driver Interface picks up the change within 5 seconds without a reload.
       </div>
     </Card>
@@ -1686,7 +1736,7 @@ function DriverUISettingsPanel(){
 }
 
 // ── Admin Panel ───────────────────────────────────────────────────────────────
-function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piStatus,firebaseStatus,mode,section,setSection,videoSource,setVideoSource,videoPlayState,setVideoPlayState,videoProgress,setVideoProgress}){
+function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piStatus,firebaseStatus,mode,section,setSection,videoSource,setVideoSource,videoPlayState,setVideoPlayState,videoProgress,setVideoProgress,piRegistry,selectedPiCode,onSelectPi}){
   const [selected,setSelected]   = useState(null);
   const [confirm,setConfirm]     = useState(null);
   const [remapping,setRemapping] = useState(false);
@@ -1744,7 +1794,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
       <div style={{padding:"14px 18px",background:`linear-gradient(135deg,rgba(244,63,94,.08),rgba(251,191,36,.05))`,border:`1px solid rgba(244,63,94,.2)`,borderRadius:14,display:"flex",alignItems:"center",gap:12}}>
         <span style={{fontSize:22}}>🛡️</span>
         <div>
-          <div style={{fontFamily:C.sans,fontWeight:800,fontSize:15,color:"#fda4af"}}>Admin Panel</div>
+          <div style={{fontFamily:C.sans,fontWeight:800,fontSize:15,color:"#D93A3A"}}>Admin Panel</div>
           <div style={{fontSize:11,fontFamily:C.mono,color:C.muted}}>Full system access · CIT-U Parking</div>
         </div>
         <div style={{marginLeft:"auto",display:"flex",gap:8}}>
@@ -1754,6 +1804,8 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
       </div>
 
       <ConnectionBanner piStatus={piStatus} firebaseStatus={firebaseStatus}/>
+
+      <PiSelector piRegistry={piRegistry} selectedPiCode={selectedPiCode} onSelect={onSelectPi}/>
 
       <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
         <StatPill label="Active Slots" value={total||"—"}    color={C.accent}/>
@@ -1765,7 +1817,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
       <div style={{display:"flex",gap:2,background:C.surface,borderRadius:12,padding:4,border:`1px solid ${C.border}`}}>
         {TABS.map(s=>(
           <button key={s.id} onClick={()=>setSection(s.id)}
-            style={{flex:1,padding:"9px 6px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:C.sans,fontWeight:700,fontSize:11,background:section===s.id?"rgba(255,255,255,.08)":"transparent",color:section===s.id?C.text:C.muted,transition:"all .2s"}}>{s.label}</button>
+            style={{flex:1,padding:"9px 6px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:C.sans,fontWeight:700,fontSize:11,background:section===s.id?"rgba(0,0,0,.06)":"transparent",color:section===s.id?C.text:C.muted,transition:"all .2s"}}>{s.label}</button>
         ))}
       </div>
 
@@ -1802,7 +1854,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
               </div>
               <button onClick={triggerRemap} disabled={remapping||piStatus!=="online"}
                 title={piStatus!=="online"?"Pi must be online to remap":`Re-run auto-mapping in ${LAYOUT_MODES.find(m=>m.id===layoutMode)?.label} mode`}
-                style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:8,border:`1px solid ${piStatus!=="online"?C.border:C.purple+"55"}`,background:piStatus!=="online"?"rgba(255,255,255,.03)":`${C.purple}15`,color:piStatus!=="online"?C.muted:C.purple,fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:remapping||piStatus!=="online"?"not-allowed":"pointer",transition:"all .2s",opacity:piStatus!=="online"?.5:1}}>
+                style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",borderRadius:8,border:`1px solid ${piStatus!=="online"?C.border:C.purple+"55"}`,background:piStatus!=="online"?"rgba(0,0,0,.03)":`${C.purple}15`,color:piStatus!=="online"?C.muted:C.purple,fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:remapping||piStatus!=="online"?"not-allowed":"pointer",transition:"all .2s",opacity:piStatus!=="online"?.5:1}}>
                 {remapping
                   ?<><span style={{width:10,height:10,border:`2px solid ${C.purple}44`,borderTopColor:C.purple,borderRadius:"50%",animation:"spin .8s linear infinite",display:"inline-block",flexShrink:0}}/>Remapping...</>
                   :"🔄 Remap Slots"}
@@ -1837,7 +1889,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
                       <span style={{fontFamily:C.mono,fontSize:12}}>Row {row}</span>
                       <span style={{fontFamily:C.mono,fontSize:12,color:p>75?C.occ:p>50?C.warn:C.vac,fontWeight:700}}>{o}/{t} ({p}%)</span>
                     </div>
-                    <div style={{height:7,background:"rgba(255,255,255,.07)",borderRadius:3,overflow:"hidden"}}>
+                    <div style={{height:7,background:"rgba(0,0,0,.08)",borderRadius:3,overflow:"hidden"}}>
                       <div style={{height:"100%",width:`${p}%`,background:p>75?`linear-gradient(90deg,${C.occ},#dc2626)`:p>50?`linear-gradient(90deg,${C.warn},#d97706)`:`linear-gradient(90deg,${C.vac},#059669)`,borderRadius:3,transition:"width .8s ease"}}/>
                     </div>
                   </div>
@@ -1981,7 +2033,7 @@ function UserView({slots,firebaseStatus}){
             <span style={{fontFamily:C.sans,fontWeight:600,fontSize:13,color:C.muted}}>Lot Capacity</span>
             <span style={{fontFamily:C.mono,fontWeight:700,fontSize:13,color:p>80?C.occ:p>60?C.warn:C.vac}}>{p}% occupied</span>
           </div>
-          <div style={{height:10,background:"rgba(255,255,255,.07)",borderRadius:5,overflow:"hidden"}}>
+          <div style={{height:10,background:"rgba(0,0,0,.08)",borderRadius:5,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${p}%`,background:p>80?`linear-gradient(90deg,${C.occ},#dc2626)`:p>60?`linear-gradient(90deg,${C.warn},#d97706)`:`linear-gradient(90deg,${C.vac},#059669)`,borderRadius:5,transition:"width .8s ease"}}/>
           </div>
           {vacant===0&&total>0&&<div style={{marginTop:10,padding:"8px 14px",borderRadius:8,background:`${C.occ}15`,border:`1px solid ${C.occ}44`,fontFamily:C.mono,fontSize:11,color:C.occ,textAlign:"center"}}>🚫 Parking lot is full</div>}
@@ -2047,7 +2099,7 @@ function UserView({slots,firebaseStatus}){
                           boxShadow:`0 0 5px ${occ?C.occ:C.vac}`,
                         }}/>
                         <div style={{fontSize:22,lineHeight:1}}>{occ?"🚗":"🅿️"}</div>
-                        <div style={{fontFamily:C.mono,fontSize:10,fontWeight:700,color:occ?"#fda4af":"#6ee7b7"}}>{id}</div>
+                        <div style={{fontFamily:C.mono,fontSize:10,fontWeight:700,color:occ?"#D93A3A":"#22A06B"}}>{id}</div>
                       </div>
                     );
                   })}
@@ -2074,9 +2126,9 @@ function UserView({slots,firebaseStatus}){
               const occ=slot.status==="Occupied";
               return(
                 <div key={id} onClick={()=>setSelected(id===selected?null:id)}
-                  style={{padding:"10px 6px",borderRadius:10,textAlign:"center",cursor:"pointer",background:selected===id?(occ?`${C.occ}30`:`${C.vac}30`):"rgba(255,255,255,.03)",border:`1px solid ${occ?C.occ+"33":C.vac+"25"}`,transition:"all .2s"}}>
+                  style={{padding:"10px 6px",borderRadius:10,textAlign:"center",cursor:"pointer",background:selected===id?(occ?`${C.occ}30`:`${C.vac}30`):"rgba(0,0,0,.03)",border:`1px solid ${occ?C.occ+"33":C.vac+"25"}`,transition:"all .2s"}}>
                   <div style={{fontSize:15,marginBottom:4}}>{occ?"🚗":"🟢"}</div>
-                  <div style={{fontSize:10,fontFamily:C.mono,fontWeight:700,color:occ?"#fda4af":"#6ee7b7"}}>{id}</div>
+                  <div style={{fontSize:10,fontFamily:C.mono,fontWeight:700,color:occ?"#D93A3A":"#22A06B"}}>{id}</div>
                   <div style={{fontSize:8,color:C.muted,marginTop:2,fontFamily:C.mono}}>Row {slot.row||"?"}</div>
                 </div>
               );
@@ -2097,6 +2149,8 @@ export default function AdminApp(){
   const [piStatus,setPiStatus]       = useState("checking");
   const [fbStatus,setFbStatus]       = useState("checking");
   const [lastUpdated,setLastUpdated] = useState(null);
+  const [piRegistry,setPiRegistry]   = useState({});
+  const [selectedPiCode,setSelectedPiCode] = useState(null);
   const [mode, setModeState]         = useState(getMode);
   const [firebasePath, setFirebasePathState] = useState(getFirebasePath);
   // Lifted so state survives tab switches
@@ -2112,6 +2166,16 @@ export default function AdminApp(){
     setPiStatus("checking");        // amber dot immediately
   }, []);
 
+  const handleSelectPi = useCallback((code) => {
+    if (code && piRegistry[code]?.apiUrl) {
+      PI_API_URL = piRegistry[code].apiUrl;
+    } else {
+      PI_API_URL = getApiUrl();     // reset to configured default
+    }
+    setSelectedPiCode(code ?? null);
+    setPiStatus("checking");
+  }, [piRegistry]);
+
   const switchFirebasePath = useCallback((newPath) => {
     setFirebasePath(newPath);       // persist to localStorage + module var
     setFirebasePathState(newPath);  // trigger re-render + effect restart
@@ -2120,6 +2184,21 @@ export default function AdminApp(){
 
   const addLog = useCallback((msg,type="info")=>{
     setLogs(p=>[...p.slice(-150),{id:logId.current++,msg,type,time:fmtTs()}]);
+  },[]);
+
+  // Poll Pi registry from Firebase every 15s
+  useEffect(()=>{
+    const load = async () => {
+      try {
+        const r = await fetch(`${FIREBASE_URL}/pi_registry.json`,{signal:AbortSignal.timeout(5000)});
+        if(!r.ok) return;
+        const data = await r.json();
+        if(data && typeof data === "object") setPiRegistry(data);
+      } catch { /* silent — non-critical */ }
+    };
+    load();
+    const iv = setInterval(load, 15000);
+    return () => clearInterval(iv);
   },[]);
 
   useEffect(()=>{
@@ -2137,8 +2216,8 @@ export default function AdminApp(){
     checkPi();
     const iv = setInterval(checkPi,15000);
     return ()=>clearInterval(iv);
-  // mode in deps so checkPi re-fires immediately against the new URL on mode switch
-  },[addLog, mode]);
+  // mode + selectedPiCode in deps so checkPi re-fires when URL changes
+  },[addLog, mode, selectedPiCode]);
 
   // Fix #8: removed the dead slot_layout merge from inside the /parking poll.
   // slot_layout is loaded once on mount from /slot_layout.json (its actual path).
@@ -2286,14 +2365,11 @@ export default function AdminApp(){
   return(
     <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:C.sans,paddingBottom:48}}>
       <style>{GLOBAL_STYLES}</style>
-      <div style={{borderBottom:`1px solid ${C.border}`,background:"rgba(7,10,16,.92)",backdropFilter:"blur(16px)",padding:"0 20px",position:"sticky",top:0,zIndex:100}}>
+      <div style={{borderBottom:`1.5px solid ${C.border}`,background:"rgba(255,255,255,.95)",backdropFilter:"blur(16px)",padding:"0 20px",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:960,margin:"0 auto",display:"flex",alignItems:"center",gap:16,height:58}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginRight:6}}>
-            <div style={{width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#0ea5e9,#6366f1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🅿️</div>
-            <div>
-              <div style={{fontWeight:800,fontSize:14,letterSpacing:"-0.02em",lineHeight:1.1}}>CIT-U Parking</div>
-              <div style={{fontSize:9,fontFamily:C.mono,color:C.muted,letterSpacing:"0.05em"}}>AI-POWERED · YOLOv8n</div>
-            </div>
+          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,letterSpacing:"-0.3px",lineHeight:1,display:"flex",alignItems:"center",gap:4,marginRight:6}}>
+            <img src="/topbar-logo.png" alt="Rizz.Park" style={{height:40,width:"auto",display:"block"}} />
+            <span>Rizz<em style={{color:C.accent,fontStyle:"normal"}}>.</em>Park</span>
           </div>
           {[{id:"user",label:"🚗 Driver View"},{id:"admin",label:"🛡️ Admin Panel"}].map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
@@ -2304,8 +2380,8 @@ export default function AdminApp(){
               onClick={() => switchFirebasePath(firebasePath === "parking" ? "parking_desktop" : "parking")}
               title={`Firebase path: /${firebasePath}. Click to switch.`}
               style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:8,
-                border:`1px solid ${firebasePath==="parking"?"rgba(16,185,129,.4)":"rgba(251,191,36,.4)"}`,
-                background:firebasePath==="parking"?"rgba(16,185,129,.12)":"rgba(251,191,36,.12)",
+                border:`1px solid ${firebasePath==="parking"?"rgba(34,160,107,.4)":"rgba(251,191,36,.4)"}`,
+                background:firebasePath==="parking"?"rgba(34,160,107,.12)":"rgba(251,191,36,.12)",
                 color:firebasePath==="parking"?C.vac:"#FBBF24",
                 fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
               {firebasePath === "parking" ? "🔥 Prod DB" : "🧪 Test DB"}
@@ -2314,8 +2390,8 @@ export default function AdminApp(){
               onClick={() => switchMode(mode === "pi" ? "desktop" : "pi")}
               title={`${mode === "pi" ? "Pi" : "Desktop"} Mode — API: ${PI_API_URL}. Click to switch.`}
               style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:8,
-                border:`1px solid ${mode==="pi"?"rgba(167,139,250,.4)":"rgba(56,189,248,.4)"}`,
-                background:mode==="pi"?"rgba(167,139,250,.12)":"rgba(56,189,248,.12)",
+                border:`1px solid ${mode==="pi"?"rgba(124,58,237,.4)":"rgba(245,166,35,.45)"}`,
+                background:mode==="pi"?"rgba(124,58,237,.12)":"rgba(245,166,35,.12)",
                 color:mode==="pi"?C.purple:C.accent,
                 fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
               {mode === "pi" ? "🔌 Pi" : "💻 Desktop"}
@@ -2334,7 +2410,8 @@ export default function AdminApp(){
               section={adminSection} setSection={setAdminSection}
               videoSource={videoSource} setVideoSource={setVideoSource}
               videoPlayState={videoPlayState} setVideoPlayState={setVideoPlayState}
-              videoProgress={videoProgress} setVideoProgress={setVideoProgress}/>}
+              videoProgress={videoProgress} setVideoProgress={setVideoProgress}
+              piRegistry={piRegistry} selectedPiCode={selectedPiCode} onSelectPi={handleSelectPi}/>}
       </div>
     </div>
   );
