@@ -10,7 +10,7 @@ const parkingIcon = L.icon({
   popupAnchor: [0, -44],
 });
 
-const DEFAULT_CENTER = [10.294756867999133, 123.8805492386066];
+const DEFAULT_CENTER = [10.3157, 123.8854];
 const MAP_ZOOM = 14 ;
 
 export default function GoogleMapView({ onClose, pins = [] }) {
@@ -33,29 +33,20 @@ export default function GoogleMapView({ onClose, pins = [] }) {
       zoomControl: true,
     });
     instanceRef.current = map;
-
+  instanceRef.current.setView(DEFAULT_CENTER, MAP_ZOOM);
    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
   maxZoom: 19,
   }).addTo(map);
 
-    const defaultWrap = document.createElement('div');
-    defaultWrap.className = 'pin-popup';
-
-    const defaultLabel = document.createElement('div');
-    defaultLabel.className = 'pin-popup-title';
-    defaultLabel.innerHTML = '<b>Rizz.Park</b> — Smart Parking';
-
-    defaultWrap.appendChild(defaultLabel);
-
-    L.marker(DEFAULT_CENTER, { icon: parkingIcon })
-      .addTo(map)
-      .bindPopup(defaultWrap)
-      .openPopup();
+    const stopDrag = () => map.fire('mouseup');
+    document.addEventListener('mouseup', stopDrag);
 
     return () => {
+      document.removeEventListener('mouseup', stopDrag);
       map.remove();
       instanceRef.current = null;
+      fbMarkersRef.current.clear();
     };
   }, []);
 

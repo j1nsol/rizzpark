@@ -30,7 +30,7 @@ export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const { slots, fbStatus, showSelectedBox } = useFirebaseSlots(getFirebasePath());
   const fcm = useFCM();
-  const { logs, clear } = useConsoleLog();
+  // const { logs, clear } = useConsoleLog();
 
   const [selectedId,     setSelectedId]     = useState(null);
   const [filter,         setFilter]         = useState('all');
@@ -171,7 +171,7 @@ export default function App() {
 
       <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} />
 
-      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} />}
+      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} />}
 
       <div className="main" style={showMapIntro ? { display: 'none' } : {}}>
         <Sidebar
@@ -210,7 +210,7 @@ export default function App() {
       {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} />}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
-      <ConsolePanel logs={logs} onClear={clear} />
+      {/* <ConsolePanel logs={logs} onClear={clear} /> */}
 
       <TweaksPanel>
         <TweakSection label="Display" />

@@ -12,10 +12,9 @@ export function usePinFirebaseSlots(pinCode) {
   const [pinName,     setPinName]     = useState(null);
   const layoutRef = useRef({});
 
-  if (!pinCode) return { slots: [], fbStatus: 'error', lastUpdated: null, pinName: null };
-
   // Fetch pin_slot_layouts every 10s
   useEffect(() => {
+    if (!pinCode) return;
     const load = async () => {
       try {
         const r = await fetch(`${FIREBASE_URL}/locations/${pinCode}/layout.json`);
@@ -31,6 +30,7 @@ export function usePinFirebaseSlots(pinCode) {
 
   // Fetch pin name every 30s
   useEffect(() => {
+    if (!pinCode) return;
     const load = async () => {
       try {
         const r = await fetch(`${FIREBASE_URL}/map_pins/${pinCode}.json`);
@@ -46,6 +46,7 @@ export function usePinFirebaseSlots(pinCode) {
 
   // Poll slot occupancy with exponential back-off
   useEffect(() => {
+    if (!pinCode) return;
     let delay      = BASE_DELAY;
     let failStreak = 0;
     let timerId    = null;

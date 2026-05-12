@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -9,37 +10,77 @@ const parkingIcon = L.icon({
   popupAnchor: [0, -44],
 });
 
-const DEFAULT_CENTER = [14.6507, 121.0686];
+const DEFAULT_CENTER = [10.3157, 123.8854];
 
-export default function MapIntro({ onContinue }) {
+export default function MapIntro({ onContinue, pins = [] }) {
+  const navigate    = useNavigate();
   const mapRef      = useRef(null);
   const instanceRef = useRef(null);
+  const markersRef  = useRef(new Map());
 
   useEffect(() => {
     if (instanceRef.current) return;
 
     const map = L.map(mapRef.current, {
       center: DEFAULT_CENTER,
-      zoom: 17,
+      zoom: 15,
       zoomControl: true,
     });
     instanceRef.current = map;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
       maxZoom: 19,
     }).addTo(map);
-
-    L.marker(DEFAULT_CENTER, { icon: parkingIcon })
-      .addTo(map)
-      .bindPopup('<b>Rizz.Park</b><br>Smart Parking')
-      .openPopup();
 
     return () => {
       map.remove();
       instanceRef.current = null;
+      markersRef.current.clear();
     };
   }, []);
+
+  useEffect(() => {
+    if (!instanceRef.current || !pins.length) return;
+
+    const currentCodes = new Set(pins.map(p => p.pinCode));
+    markersRef.current.forEach((marker, code) => {
+      if (!currentCodes.has(code)) {
+        marker.remove();
+        markersRef.current.delete(code);
+      }
+    });
+
+    pins.forEach(pin => {
+      if (markersRef.current.has(pin.pinCode)) return;
+
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:150px';
+
+      const title = document.createElement('div');
+      title.style.cssText = 'font-family:sans-serif;font-size:13px;font-weight:700';
+      title.textContent = pin.name;
+
+      const codeEl = document.createElement('div');
+      codeEl.style.cssText = 'font-family:monospace;font-size:11px;color:#64748b';
+      codeEl.textContent = `📍 ${pin.pinCode}`;
+
+      const navBtn = document.createElement('button');
+      navBtn.textContent = 'View Parking →';
+      navBtn.style.cssText = 'margin-top:4px;padding:5px 12px;border-radius:6px;border:1px solid #10b98144;background:#10b98115;color:#10b981;font-family:monospace;font-size:11px;cursor:pointer;font-weight:700';
+      navBtn.onclick = () => navigate(`/${pin.pinCode}`);
+
+      wrap.appendChild(title);
+      wrap.appendChild(codeEl);
+      wrap.appendChild(navBtn);
+
+      const marker = L.marker([pin.lat, pin.lng], { icon: parkingIcon })
+        .addTo(instanceRef.current)
+        .bindPopup(wrap);
+
+      markersRef.current.set(pin.pinCode, marker);
+    });
+  }, [pins]);
 
   return (
     <div className="map-intro">

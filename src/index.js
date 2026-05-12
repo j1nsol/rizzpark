@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import App from './App';
 import AdminApp from './pages/AdminApp';
+import PinLocationPage from './pages/PinLocationPage';
 import reportWebVitals from './reportWebVitals';
 
 
@@ -14,6 +15,7 @@ root.render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/admin" element={<AdminApp />} />
+        <Route path="/:pinCode" element={<PinLocationPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
