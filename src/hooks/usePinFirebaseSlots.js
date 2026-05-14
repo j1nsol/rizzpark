@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { normalizeAdminSlotsObject } from '../utils/slotModel';
 
-const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
-const BASE_DELAY   = 3000;
-const MAX_DELAY    = 30000;
+const FIREBASE_URL    = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
+const BASE_DELAY      = 3000;
+const MAX_DELAY       = 30000;
+const STALE_THRESHOLD = 30_000; // ms — Pi must have checked in within this window
 
 export function usePinFirebaseSlots(pinCode) {
   const [slots,       setSlots]       = useState([]);
@@ -12,7 +13,7 @@ export function usePinFirebaseSlots(pinCode) {
   const [pinName,     setPinName]     = useState(null);
   const layoutRef = useRef({});
 
-  // Fetch pin_slot_layouts every 10s
+  // Fetch geometry from locations/{pinCode}/layout every 10s
   useEffect(() => {
     if (!pinCode) return;
     const load = async () => {
@@ -28,7 +29,7 @@ export function usePinFirebaseSlots(pinCode) {
     return () => clearInterval(iv);
   }, [pinCode]);
 
-  // Fetch pin name every 30s
+  // Fetch pin name from map_pins every 30s
   useEffect(() => {
     if (!pinCode) return;
     const load = async () => {
@@ -44,7 +45,9 @@ export function usePinFirebaseSlots(pinCode) {
     return () => clearInterval(iv);
   }, [pinCode]);
 
-  // Poll slot occupancy with exponential back-off
+  // Poll live occupancy from parking/slots — the path the Pi actually writes to.
+  // Before applying slot data, verify the Pi is still alive via pi_registry lastSeen.
+  // If lastSeen is older than STALE_THRESHOLD, clear slots and show nothing.
   useEffect(() => {
     if (!pinCode) return;
     let delay      = BASE_DELAY;
@@ -53,13 +56,31 @@ export function usePinFirebaseSlots(pinCode) {
 
     const poll = async () => {
       try {
-        const r = await fetch(`${FIREBASE_URL}/locations/${pinCode}/slots.json`);
+        // Staleness check — Pi heartbeat must be recent
+        const regRes = await fetch(`${FIREBASE_URL}/pi_registry/${pinCode}.json`,
+          { signal: AbortSignal.timeout(4000) });
+        if (regRes.ok) {
+          const reg = await regRes.json();
+          if (!reg?.lastSeen || (Date.now() - reg.lastSeen) > STALE_THRESHOLD) {
+            setSlots([]);
+            setFbStatus('online'); // Firebase is reachable, Pi is just offline
+            setLastUpdated(null);
+            delay = BASE_DELAY;
+            failStreak = 0;
+            timerId = setTimeout(poll, delay);
+            return;
+          }
+        }
+
+        // Fetch live slot occupancy
+        const r = await fetch(`${FIREBASE_URL}/parking.json`,
+          { signal: AbortSignal.timeout(4000) });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
 
-        if (d && typeof d === 'object') {
+        if (d?.slots && typeof d.slots === 'object') {
           const merged = {};
-          Object.entries(d).forEach(([id, val]) => {
+          Object.entries(d.slots).forEach(([id, val]) => {
             const layout = layoutRef.current[id] ?? {};
             merged[id] = {
               status:       typeof val === 'string' ? val : (val?.status ?? 'Vacant'),
@@ -67,6 +88,7 @@ export function usePinFirebaseSlots(pinCode) {
               isOverridden: val?.isOverridden === true,
               coords:       val?.coords     ?? layout.coords     ?? null,
               row:          val?.row        ?? layout.row        ?? null,
+              col:          val?.col        ?? layout.col        ?? null,
               confidence:   val?.confidence ?? layout.confidence ?? 0.8,
             };
           });
@@ -97,9 +119,8 @@ export function usePinFirebaseSlots(pinCode) {
           failStreak = 0;
           delay      = BASE_DELAY;
         } else {
-          // Path exists but has no slots yet — still mark as online
+          setSlots([]);
           setFbStatus('online');
-          setLastUpdated(Date.now());
         }
       } catch {
         failStreak++;

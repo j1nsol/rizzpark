@@ -797,7 +797,7 @@ function ImageTestPanel({onAnalysisComplete,addLog,piStatus}){
 }
 
 // ── Slot Editor Panel ─────────────────────────────────────────────────────────
-function SlotEditorPanel({slots, piStatus, addLog}){
+function SlotEditorPanel({slots, piStatus, addLog, selectedPiCode}){
   const canvasRef                         = useRef(null);
   const [frameUrl, setFrameUrl]           = useState(null);
   const [selected, setSelected]           = useState(null);
@@ -808,11 +808,9 @@ function SlotEditorPanel({slots, piStatus, addLog}){
   // isDirty: true whenever the user has moved any corner but not yet saved/reset.
   // While dirty, incoming Firebase slot updates are ignored so edits are not wiped.
   const [isDirty, setIsDirty]             = useState(false);
-  // Track whether editSlots has been initialised at least once
-  const initialised                       = useRef(false);
-  // Pin code assignment — when set, saves also write to /pin_slot_layouts/{pinCode}
-  const [mapPins,          setMapPins]          = useState([]);
-  const [selectedPinCode,  setSelectedPinCode]  = useState('');
+  // piSlotsLoaded: true after we've successfully loaded slots from the Pi API.
+  // While true the Firebase slots prop is ignored so we only show this Pi's data.
+  const [piSlotsLoaded, setPiSlotsLoaded] = useState(false);
 
   const imgSize = {w: CAM_W, h: CAM_H};
   const piOffline = piStatus !== "online";
@@ -824,33 +822,65 @@ function SlotEditorPanel({slots, piStatus, addLog}){
     return [[x1,y1],[x2,y1],[x2,y2],[x1,y2]];
   };
 
-  // Sync slots -> editSlots ONLY when:
-  //   1. First load (not yet initialised), OR
-  //   2. New slot IDs appeared that are not in editSlots yet (remap completed).
-  // While the user has unsaved edits (isDirty) or is mid-drag, incoming Firebase
-  // updates are ignored so corners are never reset mid-edit.
-  useEffect(()=>{
-    const incomingIds  = Object.keys(slots);
-    const hasNewSlots  = incomingIds.some(id => !editSlots[id]);
-    const isFirstLoad  = !initialised.current;
+  // Load slots directly from the Pi API so the editor only shows slots that
+  // belong to this camera, not the Firebase aggregate from all Pis.
+  const loadSlotsFromPi = async () => {
+    try {
+      const r = await fetch(`${PI_API_URL}/slots`, {signal: AbortSignal.timeout(5000)});
+      if(!r.ok) return false;
+      const data = await r.json();
+      if(!data || typeof data !== "object" || Array.isArray(data) || data.error) return false;
+      const init = {};
+      Object.entries(data).forEach(([id, s]) => {
+        const q = toQuad(s.coords ?? s.quad);
+        if(!q) return;
+        init[id] = {...s, quad: q, status: s.status ?? "Vacant"};
+      });
+      if(!Object.keys(init).length) return false;
+      setEditSlots(init);
+      setSelected(null);
+      setPiSlotsLoaded(true);
+      setIsDirty(false);
+      return true;
+    } catch { return false; }
+  };
 
-    if(!isFirstLoad && (isDirty || dragState)) return;
-    if(!isFirstLoad && !hasNewSlots) return;
-
-    const init = {};
-    incomingIds.forEach(id => {
-      const q = toQuad(slots[id].coords);
-      if(!q) return;
-      // Preserve any existing edited quad for slots already in the editor,
-      // unless this is the very first load or a brand-new slot from a remap.
-      init[id] = (editSlots[id] && !isFirstLoad)
-        ? editSlots[id]
-        : {...slots[id], quad: q};
-    });
-    setEditSlots(init);
-    initialised.current = true;
+  // Load Pi slots when Pi comes online; clear piSlotsLoaded when it goes offline.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots]);
+  useEffect(()=>{
+    if(piStatus === "online") loadSlotsFromPi();
+    else setPiSlotsLoaded(false);
+  },[piStatus]);
+
+  // When Pi slots are loaded: patch status-only from Firebase so occupancy colours
+  // stay live without ever resetting coords/quad that came from the Pi.
+  // When Pi slots aren't loaded (offline / GET /slots unsupported): full Firebase sync.
+  useEffect(()=>{
+    if(!Object.keys(slots).length) return;
+    if(piSlotsLoaded){
+      setEditSlots(prev => {
+        const next = {...prev};
+        let changed = false;
+        Object.entries(slots).forEach(([id, s]) => {
+          if(next[id] && next[id].status !== s.status){
+            next[id] = {...next[id], status: s.status};
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    } else {
+      const init = {};
+      Object.keys(slots).forEach(id => {
+        const q = toQuad(slots[id].coords);
+        if(!q) return;
+        init[id] = {...slots[id], quad: q};
+      });
+      setEditSlots(init);
+      setIsDirty(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots, piSlotsLoaded]);
 
   const fetchFrame = async () => {
     if(piOffline) return;
@@ -866,15 +896,6 @@ function SlotEditorPanel({slots, piStatus, addLog}){
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{ fetchFrame(); },[piStatus]);
-
-  useEffect(()=>{
-    fetch(`${FIREBASE_URL}/map_pins.json`)
-      .then(r=>r.json())
-      .then(data=>{
-        if(data && typeof data==="object") setMapPins(Object.values(data));
-      })
-      .catch(()=>{});
-  },[]);
 
   const showMsg = (text, ok=true) => {
     setMsg({text,ok}); setTimeout(()=>setMsg(null), 5000);
@@ -1038,10 +1059,10 @@ function SlotEditorPanel({slots, piStatus, addLog}){
       });
       const d = await r.json();
       if(d.error) throw new Error(d.error);
-      if(selectedPinCode){
+      if(selectedPiCode){
         try {
-          await savePinSlotLayout(selectedPinCode, slotId, quad, editSlots[slotId]?.row ?? null);
-          addLog(`[EDITOR] ${slotId} layout saved to pin ${selectedPinCode}`, "sys");
+          await savePinSlotLayout(selectedPiCode, slotId, quad, editSlots[slotId]?.row ?? null);
+          addLog(`[EDITOR] ${slotId} layout saved to pin ${selectedPiCode}`, "sys");
         } catch(e){
           addLog(`[EDITOR] Pin layout save failed: ${e.message}`, "error");
         }
@@ -1066,15 +1087,15 @@ function SlotEditorPanel({slots, piStatus, addLog}){
           body: JSON.stringify({coords: s.quad}),
           signal: AbortSignal.timeout(5000),
         });
-        if(selectedPinCode){
+        if(selectedPiCode){
           try {
-            await savePinSlotLayout(selectedPinCode, id, s.quad, s.row ?? null);
+            await savePinSlotLayout(selectedPiCode, id, s.quad, s.row ?? null);
           } catch { /* non-fatal */ }
         }
         ok++;
       } catch { fail++; }
     }
-    if(selectedPinCode && ok>0) addLog(`[EDITOR] Saved ${ok} slot layouts to pin ${selectedPinCode}`, "sys");
+    if(selectedPiCode && ok>0) addLog(`[EDITOR] Saved ${ok} slot layouts to pin ${selectedPiCode}`, "sys");
     showMsg(`Saved ${ok} slots${fail?`, ${fail} failed`:"."}`);
     addLog(`[EDITOR] Saved all ${ok} slots to Pi`, "sys");
     if(!fail) setIsDirty(false);  // fully saved — Firebase syncs are safe again
@@ -1089,11 +1110,33 @@ function SlotEditorPanel({slots, piStatus, addLog}){
     showMsg(`Slot ${slotId} reset to original.`);
   };
 
-  // Fix #7: add slot UI — wires up the new /slots POST endpoint
-  const [addingSlot, setAddingSlot]   = useState(false);
-  const [newSlotId,  setNewSlotId]    = useState("");
-  const [newSlotRow, setNewSlotRow]   = useState("A");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [addingSlot, setAddingSlot]     = useState(false);
+  const [newSlotId,  setNewSlotId]      = useState("");
+  const [newSlotRow, setNewSlotRow]     = useState("A");
+  const [showAddForm, setShowAddForm]   = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const deleteSlotFromEditor = async (slotId) => {
+    try {
+      await fetch(`${PI_API_URL}/slots/${slotId}`, {
+        method: "DELETE",
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch { /* Pi delete endpoint may not exist; continue to Firebase */ }
+    try {
+      await deleteSlot(slotId);
+    } catch(e) {
+      showMsg(`Delete failed: ${e.message}`, false);
+      setConfirmDelete(null);
+      return;
+    }
+    setEditSlots(prev => { const n = {...prev}; delete n[slotId]; return n; });
+    if(selected === slotId) setSelected(null);
+    setConfirmDelete(null);
+    setIsDirty(false);
+    showMsg(`Slot ${slotId} removed.`);
+    addLog(`[EDITOR] Slot ${slotId} deleted`, "sys");
+  };
 
   const addSlot = async () => {
     if(!newSlotId.trim() || piOffline) return;
@@ -1111,8 +1154,14 @@ function SlotEditorPanel({slots, piStatus, addLog}){
       });
       const d = await r.json();
       if(d.error) throw new Error(d.error);
-      showMsg(`Slot ${newSlotId.trim()} added — drag corners to position it.`);
-      addLog(`[EDITOR] New slot ${newSlotId.trim()} added (row ${newSlotRow})`, "sys");
+      const sid = newSlotId.trim();
+      setEditSlots(prev => ({
+        ...prev,
+        [sid]: { status: "Vacant", quad: defaultQuad, row: newSlotRow },
+      }));
+      setSelected(sid);
+      showMsg(`Slot ${sid} added — drag corners to position it.`);
+      addLog(`[EDITOR] New slot ${sid} added (row ${newSlotRow})`, "sys");
       setIsDirty(true);
       setShowAddForm(false);
       setNewSlotId("");
@@ -1125,24 +1174,6 @@ function SlotEditorPanel({slots, piStatus, addLog}){
 
   return (
     <div style={{display:"flex", flexDirection:"column", gap:14}}>
-      <Card style={{padding:"10px 16px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-          <span style={{fontFamily:C.mono,fontSize:11,color:C.muted,whiteSpace:"nowrap"}}>Assign to Pin:</span>
-          <select value={selectedPinCode} onChange={e=>setSelectedPinCode(e.target.value)}
-            style={{background:"#0f172a",border:`1px solid ${C.border}`,color:C.text,
-              borderRadius:8,padding:"6px 10px",fontFamily:C.mono,fontSize:12,cursor:"pointer"}}>
-            <option value="">— None (global layout) —</option>
-            {mapPins.map(p=>(
-              <option key={p.pinCode} value={p.pinCode}>{p.pinCode} — {p.name}</option>
-            ))}
-          </select>
-          {selectedPinCode&&(
-            <span style={{fontFamily:C.mono,fontSize:10,color:C.vac}}>
-              Saves will also write to /pin_slot_layouts/{selectedPinCode}
-            </span>
-          )}
-        </div>
-      </Card>
       {piOffline&&(
         <div style={{padding:"12px 16px",borderRadius:10,background:`${C.occ}12`,border:`1px solid ${C.occ}33`,fontFamily:C.mono,fontSize:11,color:C.occ}}>
           ⚠️ Pi is offline — slot editing requires a live connection.
@@ -1172,7 +1203,7 @@ function SlotEditorPanel({slots, piStatus, addLog}){
               ))}
             </select>
           </div>
-          <button onClick={fetchFrame} disabled={piOffline}
+          <button onClick={()=>{ fetchFrame(); loadSlotsFromPi(); }} disabled={piOffline}
             style={{padding:"7px 13px",borderRadius:8,border:`1px solid ${C.border}`,
               background:"rgba(0,0,0,.05)",color:C.text,fontFamily:C.mono,fontSize:11,
               cursor:piOffline?"not-allowed":"pointer"}}>
@@ -1184,6 +1215,11 @@ function SlotEditorPanel({slots, piStatus, addLog}){
                 style={{padding:"7px 13px",borderRadius:8,border:`1px solid ${C.warn}44`,
                   background:`${C.warn}10`,color:C.warn,fontFamily:C.mono,fontSize:11,cursor:"pointer"}}>
                 ↺ Reset {selected}
+              </button>
+              <button onClick={()=>setConfirmDelete(selected)}
+                style={{padding:"7px 13px",borderRadius:8,border:`1px solid ${C.occ}44`,
+                  background:`${C.occ}10`,color:C.occ,fontFamily:C.mono,fontSize:11,cursor:"pointer"}}>
+                ✕ Delete {selected}
               </button>
               <button onClick={()=>saveSlot(selected)} disabled={saving||piOffline}
                 style={{padding:"7px 13px",borderRadius:8,border:"none",
@@ -1317,6 +1353,12 @@ function SlotEditorPanel({slots, piStatus, addLog}){
         ℹ️ <strong style={{color:C.accent}}>How to use:</strong> Click a slot on the canvas or pick from the dropdown → blue corner handles appear → drag any corner to reposition → Save. Changes apply to the Pi immediately and persist across restarts.
         <br/>After a Remap, refresh this tab to load the new auto-mapped quads.
       </div>
+
+      {confirmDelete&&(
+        <ConfirmDialog slotId={confirmDelete}
+          onConfirm={()=>deleteSlotFromEditor(confirmDelete)}
+          onCancel={()=>setConfirmDelete(null)}/>
+      )}
     </div>
   );
 }
@@ -1807,6 +1849,19 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
 
       <PiSelector piRegistry={piRegistry} selectedPiCode={selectedPiCode} onSelect={onSelectPi}/>
 
+      {!selectedPiCode ? (
+        <div style={{padding:"40px 20px",textAlign:"center",borderRadius:14,
+          background:"rgba(0,0,0,.03)",border:`1px dashed ${C.border}`}}>
+          <div style={{fontSize:32,marginBottom:12}}>📡</div>
+          <div style={{fontFamily:C.sans,fontWeight:700,fontSize:15,color:C.text,marginBottom:6}}>
+            Select a Pi to continue
+          </div>
+          <div style={{fontFamily:C.mono,fontSize:11,color:C.muted}}>
+            Choose a Pi unit above to load its camera feed, slots, and controls.
+          </div>
+        </div>
+      ) : (<>
+
       <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
         <StatPill label="Active Slots" value={total||"—"}    color={C.accent}/>
         <StatPill label="Occupied"     value={occupied||"—"} color={C.occ} sub={total?`${pct(occupied,total)}% full`:undefined}/>
@@ -1910,7 +1965,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
       )}
 
       {section==="editor"&&(
-        <SlotEditorPanel slots={slots} piStatus={piStatus} addLog={addLog}/>
+        <SlotEditorPanel slots={slots} piStatus={piStatus} addLog={addLog} selectedPiCode={selectedPiCode}/>
       )}
 
       {section==="program"&&(
@@ -1973,6 +2028,7 @@ function AdminPanel({slots,logs,onRemove,removedSlots,addLog,onImageAnalysis,piS
       )}
 
       {confirm&&<ConfirmDialog slotId={confirm} onConfirm={()=>{onRemove(confirm);setConfirm(null);setSelected(null);}} onCancel={()=>setConfirm(null)}/>}
+      </>)}
     </div>
   );
 }
@@ -2202,6 +2258,7 @@ export default function AdminApp(){
   },[]);
 
   useEffect(()=>{
+    if(!selectedPiCode){ setPiStatus("checking"); return; }
     const checkPi = async () => {
       try {
         const r = await fetch(`${PI_API_URL}/status`,{signal:AbortSignal.timeout(4000)});
@@ -2216,13 +2273,13 @@ export default function AdminApp(){
     checkPi();
     const iv = setInterval(checkPi,15000);
     return ()=>clearInterval(iv);
-  // mode + selectedPiCode in deps so checkPi re-fires when URL changes
   },[addLog, mode, selectedPiCode]);
 
   // Fix #8: removed the dead slot_layout merge from inside the /parking poll.
   // slot_layout is loaded once on mount from /slot_layout.json (its actual path).
   // The /parking node only contains {slots, summary} — no slot_layout key there.
   useEffect(()=>{
+    if(!selectedPiCode){ setSlots({}); setFbStatus("checking"); return; }
     if(!FIREBASE_URL||FIREBASE_URL.includes("YOUR_PROJECT")){
       setFbStatus("error");
       addLog("[FB]   Firebase URL not configured","error");
@@ -2280,13 +2337,14 @@ export default function AdminApp(){
 
     poll();
     return ()=>{ if(timerId) clearTimeout(timerId); };
-  },[addLog, mode, firebasePath]);
+  },[addLog, mode, firebasePath, selectedPiCode]);
 
   // Fix #5: slot_layout is the authoritative source of coords.
   // Poll it every 10s so the map updates automatically after a Remap
   // without requiring a page reload. Uses a simple interval (not backoff)
   // since a failed layout fetch is non-critical — occupancy still works.
   useEffect(()=>{
+    if(!selectedPiCode) return;
     if(!FIREBASE_URL||FIREBASE_URL.includes("YOUR_PROJECT")) return;
     let lastLayoutKey = "";   // detect when the layout actually changed
 
@@ -2322,7 +2380,7 @@ export default function AdminApp(){
     loadLayout();
     const iv = setInterval(loadLayout, 10000);   // refresh every 10s to catch Remaps
     return ()=>clearInterval(iv);
-  },[addLog, mode, firebasePath]);
+  },[addLog, mode, firebasePath, selectedPiCode]);
 
   const handleRemove = useCallback(async (id)=>{
     // Optimistically remove from UI so the action feels instant.

@@ -32,11 +32,14 @@ export default function PinLocationPage() {
   const vacant   = slots.filter(s => s.status === 'vacant').length;
   const occupied = slots.filter(s => s.status === 'occupied').length;
 
+  const hasLiveData = fbStatus === 'online' && lastUpdated !== null && slots.length > 0;
+
   const statusLine =
     fbStatus === 'checking' ? 'Connecting…' :
-    fbStatus === 'error'    ? 'Connection error' :
-    lastUpdated             ? `${vacant} available · ${occupied} occupied · updated ${new Date(lastUpdated).toLocaleTimeString('en-PH', { hour12: false })}` :
-    'No data yet';
+    fbStatus === 'error'    ? 'Connection error — check your connection' :
+    !lastUpdated            ? 'Waiting for Pi…' :
+    !hasLiveData            ? 'Pi offline — no live data' :
+    `${vacant} available · ${occupied} occupied · updated ${new Date(lastUpdated).toLocaleTimeString('en-PH', { hour12: false })}`;
 
   const selectedSlot = selectedId ? slots.find(s => s.id === selectedId) ?? null : null;
 
@@ -46,7 +49,7 @@ export default function PinLocationPage() {
 
       <div className="main">
         <Sidebar
-          slots={slots}
+          slots={hasLiveData ? slots : []}
           filter={filter}
           selectedSlot={selectedSlot}
           onFilterChange={setFilter}
@@ -67,14 +70,29 @@ export default function PinLocationPage() {
             </button>
           </div>
 
-          <ParkingCardGrid
-            slots={slots}
-            selected={selectedId}
-            onSelect={setSelectedId}
-            filter={filter}
-            theme="driver"
-            showCarIcon={true}
-          />
+          {hasLiveData ? (
+            <ParkingCardGrid
+              slots={slots}
+              selected={selectedId}
+              onSelect={setSelectedId}
+              filter={filter}
+              theme="driver"
+              showCarIcon={true}
+            />
+          ) : (
+            <div style={{
+              display:'flex', flexDirection:'column', alignItems:'center',
+              justifyContent:'center', gap:12, padding:'60px 20px', opacity:0.5,
+            }}>
+              <div style={{fontSize:40}}>📡</div>
+              <div style={{fontWeight:700, fontSize:16}}>No live data</div>
+              <div style={{fontSize:13, textAlign:'center', maxWidth:280}}>
+                {fbStatus === 'checking'
+                  ? 'Connecting to live feed…'
+                  : 'The Pi for this location is offline or hasn\'t reported recently.'}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

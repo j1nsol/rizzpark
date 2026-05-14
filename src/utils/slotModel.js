@@ -19,7 +19,7 @@ export function normalizeAdminSlot(id, raw) {
     id,
     status: raw.status?.toLowerCase() === 'occupied' ? 'occupied' : 'vacant',
     row: raw.row ?? null,
-    col: null,
+    col: raw.col ?? null,
     coords: raw.coords ?? null,
     confidence: raw.confidence ?? 0.8,
     updatedAt: raw.updatedAt ?? Date.now(),
@@ -75,7 +75,13 @@ export function groupSlotsByRowField(slots) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([label, rowSlots]) => ({
       label,
-      slots: rowSlots.sort((a, b) => (a.col ?? 0) - (b.col ?? 0) || a.id.localeCompare(b.id)),
+      slots: rowSlots.sort((a, b) => {
+        if (a.col != null && b.col != null) return a.col - b.col;
+        const ax = a.coords ? computeCentroid(a.coords).x : 0;
+        const bx = b.coords ? computeCentroid(b.coords).x : 0;
+        if (ax !== bx) return ax - bx;
+        return a.id.localeCompare(b.id);
+      }),
     }));
 }
 
