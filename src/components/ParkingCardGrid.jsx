@@ -21,6 +21,7 @@ import { groupSlots } from '../utils/slotModel';
 const A = {
   occ:    '#f43f5e',
   vac:    '#10b981',
+  res:    '#f97316',
   border: 'rgba(255,255,255,0.07)',
   muted:  'rgba(226,232,240,0.38)',
   mono:   "'JetBrains Mono', monospace",
@@ -47,7 +48,7 @@ function AdminRowDivider({ label, vacantCount, totalCount }) {
 function AdminLegend() {
   return (
     <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginTop: 8 }}>
-      {[[A.vac, 'Available'], [A.occ, 'Occupied']].map(([color, label]) => (
+      {[[A.vac, 'Available'], [A.res, 'Reserved'], [A.occ, 'Occupied']].map(([color, label]) => (
         <div key={label} style={{
           display: 'flex', alignItems: 'center', gap: 6,
           fontSize: 11, fontFamily: A.mono, color: A.muted,

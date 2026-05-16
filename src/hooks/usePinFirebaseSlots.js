@@ -73,14 +73,14 @@ export function usePinFirebaseSlots(pinCode) {
         }
 
         // Fetch live slot occupancy
-        const r = await fetch(`${FIREBASE_URL}/parking.json`,
+        const r = await fetch(`${FIREBASE_URL}/locations/${pinCode}/slots.json`,
           { signal: AbortSignal.timeout(4000) });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
 
-        if (d?.slots && typeof d.slots === 'object') {
+        if (d && typeof d === 'object') {
           const merged = {};
-          Object.entries(d.slots).forEach(([id, val]) => {
+          Object.entries(d).forEach(([id, val]) => {
             const layout = layoutRef.current[id] ?? {};
             merged[id] = {
               status:       typeof val === 'string' ? val : (val?.status ?? 'Vacant'),

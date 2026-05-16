@@ -3,8 +3,8 @@
 // Consumed by both the Admin Panel and the Public Driver Interface.
 //
 // NormalizedSlot shape:
-//   id         : string                         — e.g. "S01"
-//   status     : "occupied" | "vacant"          — always lowercase
+//   id         : string                              — e.g. "S01"
+//   status     : "occupied" | "vacant" | "reserved"  — always lowercase
 //   row        : string | null                  — letter label, e.g. "A"
 //   col        : number | null                  — column index
 //   coords     : [[x,y],[x,y],[x,y],[x,y]] | null — detection quad (camera pixels)
@@ -17,7 +17,9 @@
 export function normalizeAdminSlot(id, raw) {
   return {
     id,
-    status: raw.status?.toLowerCase() === 'occupied' ? 'occupied' : 'vacant',
+    status: ['occupied', 'reserved'].includes(raw.status?.toLowerCase())
+      ? raw.status.toLowerCase()
+      : 'vacant',
     row: raw.row ?? null,
     col: raw.col ?? null,
     coords: raw.coords ?? null,

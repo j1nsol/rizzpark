@@ -11,6 +11,7 @@
 const ADMIN_C = {
   occ:  '#f43f5e',
   vac:  '#10b981',
+  res:  '#f97316',
   mono: "'JetBrains Mono', monospace",
 };
 
@@ -29,10 +30,15 @@ function CarIconSVG({ color }) {
 
 export default function ParkingSlotCard({ slot, isSelected, onClick, theme = 'driver', showCarIcon = true }) {
   const occ = slot.status === 'occupied';
+  const res = slot.status === 'reserved';
 
   // ── Admin dark theme ───────────────────────────────────────────────────────
   if (theme === 'admin') {
-    const activeColor = occ ? ADMIN_C.occ : ADMIN_C.vac;
+    const activeColor = occ ? ADMIN_C.occ : res ? ADMIN_C.res : ADMIN_C.vac;
+    const bgSelected  = occ ? `${ADMIN_C.occ}35` : res ? `${ADMIN_C.res}28` : `${ADMIN_C.vac}30`;
+    const bgDefault   = occ ? `${ADMIN_C.occ}18` : res ? `${ADMIN_C.res}12` : `${ADMIN_C.vac}10`;
+    const bdDefault   = occ ? `${ADMIN_C.occ}55` : res ? `${ADMIN_C.res}55` : `${ADMIN_C.vac}40`;
+    const labelColor  = occ ? '#fda4af'           : res ? '#fdba74'           : '#6ee7b7';
     return (
       <div
         onClick={onClick}
@@ -43,12 +49,8 @@ export default function ParkingSlotCard({ slot, isSelected, onClick, theme = 'dr
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
           gap: 6, padding: '10px 6px 8px',
-          background: isSelected
-            ? (occ ? `${ADMIN_C.occ}35` : `${ADMIN_C.vac}30`)
-            : (occ ? `${ADMIN_C.occ}18` : `${ADMIN_C.vac}10`),
-          border: `1.5px solid ${isSelected
-            ? activeColor
-            : (occ ? `${ADMIN_C.occ}55` : `${ADMIN_C.vac}40`)}`,
+          background: isSelected ? bgSelected : bgDefault,
+          border: `1.5px solid ${isSelected ? activeColor : bdDefault}`,
           boxShadow: isSelected ? `0 0 14px ${activeColor}55` : 'none',
           transition: 'all .2s',
         }}
@@ -59,11 +61,10 @@ export default function ParkingSlotCard({ slot, isSelected, onClick, theme = 'dr
           width: 6, height: 6, borderRadius: '50%',
           background: activeColor, boxShadow: `0 0 5px ${activeColor}`,
         }} />
-        {/* Car icon for both states — red when occupied, green when vacant */}
         <CarIconSVG color={activeColor} />
         <div style={{
           fontFamily: ADMIN_C.mono, fontSize: 10, fontWeight: 700,
-          color: occ ? '#fda4af' : '#6ee7b7',
+          color: labelColor,
         }}>
           {slot.id}
         </div>
