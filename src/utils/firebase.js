@@ -53,6 +53,21 @@ export async function clearSlotOverride(id) {
   });
 }
 
+// Override for a pin-specific location (locations/{pinCode}/slots/{id}).
+export async function setPinSlotOverride(pinCode, id, status) {
+  await update(ref(db, `locations/${pinCode}/slots/${id}`), {
+    manualStatus: status,
+    isOverridden: true,
+  });
+}
+
+export async function clearPinSlotOverride(pinCode, id) {
+  await update(ref(db, `locations/${pinCode}/slots/${id}`), {
+    manualStatus: null,
+    isOverridden: false,
+  });
+}
+
 // Writes the showSelectedBox setting to /settings/showSelectedBox.
 // Controls whether the Selected Box card is visible in the Driver UI.
 export async function setShowSelectedBox(value) {

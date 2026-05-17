@@ -26,6 +26,7 @@ export default function Sidebar({
   onFilterChange,
   onToggleStatus,
   onDeselect,
+  onClearOverride,
   showSelectedBox = true,
 }) {
   const total    = slots.length;
@@ -37,7 +38,11 @@ export default function Sidebar({
   async function handleClearOverride() {
     if (!selectedSlot) return;
     try {
-      await clearSlotOverride(selectedSlot.id);
+      if (onClearOverride) {
+        await onClearOverride(selectedSlot.id);
+      } else {
+        await clearSlotOverride(selectedSlot.id);
+      }
     } catch (e) {
       console.error('Failed to clear override:', e);
     }

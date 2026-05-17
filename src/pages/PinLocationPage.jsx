@@ -6,6 +6,7 @@ import Sidebar       from '../components/Sidebar';
 import ParkingCardGrid from '../components/ParkingCardGrid';
 import GoogleMapView from '../components/GoogleMapView';
 import { usePinFirebaseSlots } from '../hooks/usePinFirebaseSlots';
+import { setPinSlotOverride, clearPinSlotOverride } from '../utils/firebase';
 
 const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
 
@@ -48,6 +49,15 @@ export default function PinLocationPage() {
 
   const selectedSlot = selectedId ? slots.find(s => s.id === selectedId) ?? null : null;
 
+  async function handleToggleStatus(slot) {
+    const newStatus = slot.status === 'occupied' ? 'Vacant' : 'Occupied';
+    try {
+      await setPinSlotOverride(pinCode, slot.id, newStatus);
+    } catch (e) {
+      console.error('Failed to override slot status:', e);
+    }
+  }
+
   return (
     <div className="app">
       <Topbar notifPerm="unavailable" onNotifClick={() => {}} />
@@ -58,7 +68,8 @@ export default function PinLocationPage() {
           filter={filter}
           selectedSlot={selectedSlot}
           onFilterChange={setFilter}
-          onToggleStatus={() => {}}
+          onToggleStatus={handleToggleStatus}
+          onClearOverride={(id) => clearPinSlotOverride(pinCode, id)}
           onDeselect={() => setSelectedId(null)}
           showSelectedBox={true}
         />
