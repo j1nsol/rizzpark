@@ -117,10 +117,7 @@ export function fireNotif(slot) {
     vibrate: settings.vibrationEnabled ? [200, 100, 200] : undefined,
   };
 
-  // Only show if page is visible (FCM handles background notifications)
-  if (document.visibilityState === 'visible') {
-    new Notification('Rizz Park — Slot Available!', options);
-  }
+  new Notification('Rizz Park — Slot Available!', options);
 }
 
 // ── Device detection ──────────────────────────────────────────────────────────
