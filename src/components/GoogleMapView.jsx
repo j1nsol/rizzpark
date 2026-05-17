@@ -21,7 +21,9 @@ const unavailableIcon = L.divIcon({
 const DEFAULT_CENTER = [10.3157, 123.8854];
 const MAP_ZOOM = 14 ;
 
-export default function GoogleMapView({ onClose, pins = [], activePinCode = null }) {
+const PIN_ACTIVE_TTL = 45_000; // ms — pin is live if heartbeat is within this window
+
+export default function GoogleMapView({ onClose, pins = [], activePins = null }) {
   const navigate        = useNavigate();
   const mapRef          = useRef(null);
   const instanceRef     = useRef(null);
@@ -62,12 +64,13 @@ export default function GoogleMapView({ onClose, pins = [], activePinCode = null
   useEffect(() => {
     if (!instanceRef.current) return;
 
-    // Clear and rebuild all markers so icon/popup reflects latest activePinCode
+    // Clear and rebuild all markers so icon/popup reflects latest activePins
     fbMarkersRef.current.forEach(marker => marker.remove());
     fbMarkersRef.current.clear();
 
     pins.forEach(pin => {
-      const isAvailable = activePinCode !== null && pin.pinCode === activePinCode;
+      const ts = activePins?.[pin.pinCode];
+      const isAvailable = ts != null && (Date.now() - ts) < PIN_ACTIVE_TTL;
       const icon = isAvailable ? parkingIcon : unavailableIcon;
 
       const wrap = document.createElement('div');
@@ -107,7 +110,7 @@ export default function GoogleMapView({ onClose, pins = [], activePinCode = null
 
       fbMarkersRef.current.set(pin.pinCode, marker);
     });
-  }, [pins, activePinCode]);
+  }, [pins, activePins]);
 
   async function handleSearch(e) {
     e.preventDefault();

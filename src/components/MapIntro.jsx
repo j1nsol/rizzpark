@@ -20,7 +20,9 @@ const unavailableIcon = L.divIcon({
 
 const DEFAULT_CENTER = [10.3157, 123.8854];
 
-export default function MapIntro({ onContinue, pins = [], activePinCode = null }) {
+const PIN_ACTIVE_TTL = 45_000;
+
+export default function MapIntro({ onContinue, pins = [], activePins = null }) {
   const navigate    = useNavigate();
   const mapRef      = useRef(null);
   const instanceRef = useRef(null);
@@ -55,7 +57,8 @@ export default function MapIntro({ onContinue, pins = [], activePinCode = null }
     markersRef.current.clear();
 
     pins.forEach(pin => {
-      const isAvailable = activePinCode !== null && pin.pinCode === activePinCode;
+      const ts = activePins?.[pin.pinCode];
+      const isAvailable = ts != null && (Date.now() - ts) < PIN_ACTIVE_TTL;
       const icon = isAvailable ? parkingIcon : unavailableIcon;
 
       const wrap = document.createElement('div');
@@ -95,7 +98,7 @@ export default function MapIntro({ onContinue, pins = [], activePinCode = null }
 
       markersRef.current.set(pin.pinCode, marker);
     });
-  }, [pins, activePinCode]);
+  }, [pins, activePins]);
 
   return (
     <div className="map-intro">

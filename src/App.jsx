@@ -44,7 +44,7 @@ export default function App() {
   const [showMap,        setShowMap]        = useState(false);
   const [showMapIntro,   setShowMapIntro]   = useState(false);
   const [allPins,        setAllPins]        = useState([]);
-  const [activePinCode,  setActivePinCode]  = useState(null);
+  const [activePins,     setActivePins]     = useState(null);
 
   const toastId      = useRef(0);
   const prevSlotsRef = useRef([]);
@@ -84,9 +84,9 @@ export default function App() {
       .then(r => r.json())
       .then(data => { if (data && typeof data === 'object') setAllPins(Object.values(data)); })
       .catch(() => {});
-    fetch(`${base}/pi_config/active_pin.json`)
+    fetch(`${base}/pi_config/active_pins.json`)
       .then(r => r.json())
-      .then(data => { if (typeof data === 'string') setActivePinCode(data); })
+      .then(data => { if (data && typeof data === 'object') setActivePins(data); })
       .catch(() => {});
   }, []);
 
@@ -177,7 +177,7 @@ export default function App() {
 
       <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} />
 
-      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} activePinCode={activePinCode} />}
+      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} activePins={activePins} />}
 
       <div className="main" style={showMapIntro ? { display: 'none' } : {}}>
         <Sidebar
@@ -213,7 +213,7 @@ export default function App() {
         </div>
       </div>
 
-      {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePinCode={activePinCode} />}
+      {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} />}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
       {/* <ConsolePanel logs={logs} onClear={clear} /> */}
