@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { requestFCMToken, onFCMMessage, deleteFCMToken } from '../utils/firebase';
+import { requestFCMToken, onFCMMessage } from '../utils/firebase';
 
 export function useFCM() {
   const [token, setToken] = useState(null);
@@ -66,15 +66,6 @@ export function useFCM() {
 
     return onFCMMessage(callback);
   }, [isSupported, token]);
-
-  // Cleanup token on unmount
-  useEffect(() => {
-    return () => {
-      if (token) {
-        deleteFCMToken(token).catch(console.error);
-      }
-    };
-  }, [token]);
 
   return {
     // State

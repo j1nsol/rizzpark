@@ -39,10 +39,8 @@ exports.onSlotStatusChange = functions.database
         return null;
       }
 
-      // Get slot details for notification
-      const slotLayout = await db.ref(`slot_layout/${slotId}`).once('value');
-      const layout = slotLayout.val() || {};
-      const row = layout.row || 'Unknown';
+      // Row is in the slot data itself
+      const row = after.row || slotId.charAt(0) || 'Unknown';
 
       // Create notification payload
       const payload = {
