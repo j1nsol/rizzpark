@@ -83,7 +83,7 @@ exports.onSlotStatusChange = functions.database
 
       const results = await Promise.allSettled(
         batches.map(batch =>
-          messaging.sendMulticast({
+          messaging.sendEachForMulticast({
             tokens: batch,
             notification: {
               title: payload.notification.title,
@@ -98,7 +98,7 @@ exports.onSlotStatusChange = functions.database
                 tag:               payload.notification.tag,
                 requireInteraction: true,
               },
-              fcmOptions: { link: '/' },
+              fcmOptions: { link: 'https://rizzpark.vercel.app/' },
             },
             data: payload.data,
           })
@@ -211,7 +211,7 @@ exports.onPinSlotStatusChange = functions.database
 
       const results = await Promise.allSettled(
         batches.map(batch =>
-          messaging.sendMulticast({
+          messaging.sendEachForMulticast({
             tokens: batch,
             notification: { title, body },
             webpush: {
@@ -223,7 +223,7 @@ exports.onPinSlotStatusChange = functions.database
                 tag,
                 requireInteraction: true,
               },
-              fcmOptions: { link: `/${pinCode}` },
+              fcmOptions: { link: `https://rizzpark.vercel.app/${pinCode}` },
             },
             data: { slotId, row, pinCode, type: 'slot_available', timestamp: Date.now().toString() },
           })
@@ -246,6 +246,7 @@ exports.onPinSlotStatusChange = functions.database
           });
         } else {
           failureCount += batches[batchIndex].length;
+          console.log(`[${pinCode}] Batch ${batchIndex} rejected: ${result.reason?.code} — ${result.reason?.message}`);
         }
       });
 
@@ -340,7 +341,7 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
       },
     };
 
-    const response = await messaging.sendMulticast({
+    const response = await messaging.sendEachForMulticast({
       tokens: validTokens,
       notification: {
         title: payload.notification.title,
