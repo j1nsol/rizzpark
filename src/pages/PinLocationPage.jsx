@@ -6,12 +6,14 @@ import Sidebar       from '../components/Sidebar';
 import ParkingCardGrid from '../components/ParkingCardGrid';
 import GoogleMapView from '../components/GoogleMapView';
 import { usePinFirebaseSlots } from '../hooks/usePinFirebaseSlots';
+import { useFCM } from '../hooks/useFCM';
 
 const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 export default function PinLocationPage() {
   const { pinCode } = useParams();
   const { slots, fbStatus, lastUpdated, pinName } = usePinFirebaseSlots(pinCode);
+  const fcm = useFCM();
 
   const [selectedId, setSelectedId] = useState(null);
   const [filter,     setFilter]     = useState('all');
@@ -50,7 +52,7 @@ export default function PinLocationPage() {
 
   return (
     <div className="app">
-      <Topbar notifPerm="unavailable" onNotifClick={() => {}} />
+      <Topbar notifPerm={fcm.permission} onNotifClick={() => fcm.requestPermission().catch(() => {})} />
 
       <div className="main">
         <Sidebar
