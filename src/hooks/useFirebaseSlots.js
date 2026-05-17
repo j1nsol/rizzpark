@@ -87,6 +87,7 @@ export function useFirebaseSlots(firebasePath) {
               isOverridden: val?.isOverridden === true,
               coords:       val?.coords     ?? layout.coords     ?? null,
               row:          val?.row        ?? layout.row        ?? null,
+              col:          val?.col        ?? layout.col        ?? null,
               confidence:   val?.confidence ?? layout.confidence ?? 0.8,
             };
           });

@@ -11,6 +11,9 @@
   --occupied:      #D93A3A;
   --occupied-bg:   #FDEAEA;
   --occupied-border:#F4AAAA;
+  --reserved:        #F97316;
+  --reserved-bg:     #FFF4E8;
+  --reserved-border: #FDBA74;
 
   --text:          #111;
   --text-2:        #555;
@@ -154,6 +157,7 @@ body::before {
 .legend-dot { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
 .legend-dot.vacant   { background: var(--vacant); }
 .legend-dot.occupied { background: var(--occupied); }
+.legend-dot.reserved { background: var(--reserved); }
 .legend-dot.all      { background: linear-gradient(135deg, var(--vacant) 50%, var(--occupied) 50%); }
 .legend-count { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-3); }
 
@@ -238,14 +242,16 @@ body::before {
 .slot-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); z-index: 2; }
 .slot-card.selected { transform: translateY(-3px) scale(1.04); box-shadow: 0 0 0 3px var(--accent), var(--shadow-md); z-index: 3; }
 
-.slot-card.vacant   { background: var(--vacant-bg); border-color: var(--vacant-border); }
+.slot-card.vacant   { background: var(--vacant-bg);   border-color: var(--vacant-border); }
 .slot-card.occupied { background: var(--occupied-bg); border-color: var(--occupied-border); }
+.slot-card.reserved { background: var(--reserved-bg); border-color: var(--reserved-border); }
 
 .slot-icon { width: 32px; height: 22px; }
 .slot-label { font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: .02em; }
 .slot-status-dot { width: 8px; height: 8px; border-radius: 50%; position: absolute; top: 7px; right: 7px; }
 .slot-card.vacant   .slot-status-dot { background: var(--vacant); }
 .slot-card.occupied .slot-status-dot { background: var(--occupied); }
+.slot-card.reserved .slot-status-dot { background: var(--reserved); }
 
 @keyframes slotPulse {
   0%   { transform: scale(1); }
@@ -491,7 +497,7 @@ select.twk-field{padding-right:22px;
   user-select:none;padding-right:8px}
 .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
   font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
-  outline:none;color:inherit;-moz-appearance:textfield}
+  outline:none;color:inherit;-moz-appearance:textfield;appearance:textfield}
 .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
   -webkit-appearance:none;margin:0}
 .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}

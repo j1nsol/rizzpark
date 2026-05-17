@@ -25,10 +25,14 @@ const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
 export const messaging = getMessaging(app);
 
-// Permanently removes a slot from Firebase at /parking/slots/{id}.
+// Permanently removes a slot from Firebase at locations/{pinCode}/slots/{id}
+// and locations/{pinCode}/layout/{id}.
 // Throws on network or permission errors — callers should handle.
-export async function deleteSlot(id) {
-  await remove(ref(db, `parking/slots/${id}`));
+export async function deleteSlot(pinCode, id) {
+  await Promise.all([
+    remove(ref(db, `locations/${pinCode}/slots/${id}`)),
+    remove(ref(db, `locations/${pinCode}/layout/${id}`)),
+  ]);
 }
 
 // Writes a manual status override for a slot.
@@ -115,5 +119,13 @@ export async function deleteMapPin(pinCode) {
 }
 
 export async function savePinSlotLayout(pinCode, slotId, coords, row) {
-  await set(ref(db, `pin_slot_layouts/${pinCode}/${slotId}`), { coords, row: row ?? null });
+  await set(ref(db, `locations/${pinCode}/layout/${slotId}`), { coords, row: row ?? null });
+}
+
+export async function setPiActivePin(pinCode) {
+  await set(ref(db, 'pi_config/active_pin'), pinCode);
+}
+
+export async function clearPiActivePin() {
+  await remove(ref(db, 'pi_config/active_pin'));
 }

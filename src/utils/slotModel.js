@@ -3,8 +3,8 @@
 // Consumed by both the Admin Panel and the Public Driver Interface.
 //
 // NormalizedSlot shape:
-//   id         : string                         — e.g. "S01"
-//   status     : "occupied" | "vacant"          — always lowercase
+//   id         : string                              — e.g. "S01"
+//   status     : "occupied" | "vacant" | "reserved"  — always lowercase
 //   row        : string | null                  — letter label, e.g. "A"
 //   col        : number | null                  — column index
 //   coords     : [[x,y],[x,y],[x,y],[x,y]] | null — detection quad (camera pixels)
@@ -17,9 +17,11 @@
 export function normalizeAdminSlot(id, raw) {
   return {
     id,
-    status: raw.status?.toLowerCase() === 'occupied' ? 'occupied' : 'vacant',
+    status: ['occupied', 'reserved'].includes(raw.status?.toLowerCase())
+      ? raw.status.toLowerCase()
+      : 'vacant',
     row: raw.row ?? null,
-    col: null,
+    col: raw.col ?? null,
     coords: raw.coords ?? null,
     confidence: raw.confidence ?? 0.8,
     updatedAt: raw.updatedAt ?? Date.now(),
@@ -75,7 +77,13 @@ export function groupSlotsByRowField(slots) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([label, rowSlots]) => ({
       label,
-      slots: rowSlots.sort((a, b) => (a.col ?? 0) - (b.col ?? 0) || a.id.localeCompare(b.id)),
+      slots: rowSlots.sort((a, b) => {
+        if (a.col != null && b.col != null) return a.col - b.col;
+        const ax = a.coords ? computeCentroid(a.coords).x : 0;
+        const bx = b.coords ? computeCentroid(b.coords).x : 0;
+        if (ax !== bx) return ax - bx;
+        return a.id.localeCompare(b.id);
+      }),
     }));
 }
 

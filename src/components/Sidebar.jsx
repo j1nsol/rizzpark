@@ -4,6 +4,7 @@ import { clearSlotOverride } from '../utils/firebase';
 const FILTER_OPTIONS = [
   { key: 'all',      label: 'All Slots',  cls: 'all' },
   { key: 'vacant',   label: 'Vacant',     cls: 'vacant' },
+  { key: 'reserved', label: 'Reserved',   cls: 'reserved' },
   { key: 'occupied', label: 'Occupied',   cls: 'occupied' },
 ];
 
@@ -30,6 +31,7 @@ export default function Sidebar({
   const total    = slots.length;
   const vacant   = slots.filter((s) => s.status === 'vacant').length;
   const occupied = slots.filter((s) => s.status === 'occupied').length;
+  const reserved = slots.filter((s) => s.status === 'reserved').length;
   const occPct   = Math.round((occupied / total) * 100);
 
   async function handleClearOverride() {
@@ -62,6 +64,14 @@ export default function Sidebar({
             <div className="s-sub">in use</div>
           </div>
 
+          {reserved > 0 && (
+            <div className="stat-box" style={{ borderColor: 'var(--reserved-border)', background: 'var(--reserved-bg)' }}>
+              <div className="s-label" style={{ color: 'var(--reserved)' }}>Reserved</div>
+              <div className="s-val" style={{ color: 'var(--reserved)' }}>{reserved}</div>
+              <div className="s-sub" style={{ color: 'var(--reserved)' }}>pre-booked</div>
+            </div>
+          )}
+
           <div className="stat-box full">
             <div className="s-label">Occupancy</div>
             <div className="s-val">
@@ -79,7 +89,7 @@ export default function Sidebar({
         <div className="sidebar-section-title">Filter</div>
         <div className="legend">
           {FILTER_OPTIONS.map(({ key, label, cls }) => {
-            const count = key === 'all' ? total : key === 'vacant' ? vacant : occupied;
+            const count = key === 'all' ? total : key === 'vacant' ? vacant : key === 'reserved' ? reserved : occupied;
             return (
               <div
                 key={key}
@@ -113,7 +123,7 @@ export default function Sidebar({
               <div className="sd-row"><span>Column</span><b>{selectedSlot.col}</b></div>
               <div className="sd-row">
                 <span>Status</span>
-                <b style={{ color: selectedSlot.status === 'vacant' ? 'var(--vacant)' : 'var(--occupied)' }}>
+                <b style={{ color: selectedSlot.status === 'vacant' ? 'var(--vacant)' : selectedSlot.status === 'reserved' ? 'var(--reserved)' : 'var(--occupied)' }}>
                   {selectedSlot.status.charAt(0).toUpperCase() + selectedSlot.status.slice(1)}
                 </b>
               </div>
