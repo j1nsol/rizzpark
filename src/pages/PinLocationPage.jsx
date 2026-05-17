@@ -16,15 +16,20 @@ export default function PinLocationPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [filter,     setFilter]     = useState('all');
   const [showMap,    setShowMap]    = useState(false);
-  const [allPins,    setAllPins]    = useState([]);
+  const [allPins,      setAllPins]      = useState([]);
+  const [activePinCode, setActivePinCode] = useState(null);
 
-  // Load all Firebase pins so they appear in the map
+  // Load all Firebase pins and active Pi pin for the map
   useEffect(() => {
     fetch(`${FIREBASE_URL}/map_pins.json`)
       .then(r => r.json())
       .then(data => {
         if (data && typeof data === 'object') setAllPins(Object.values(data));
       })
+      .catch(() => {});
+    fetch(`${FIREBASE_URL}/pi_config/active_pin.json`)
+      .then(r => r.json())
+      .then(data => { if (typeof data === 'string') setActivePinCode(data); })
       .catch(() => {});
   }, []);
 
@@ -97,7 +102,7 @@ export default function PinLocationPage() {
       </div>
 
       {showMap && (
-        <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} />
+        <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePinCode={activePinCode} />
       )}
     </div>
   );

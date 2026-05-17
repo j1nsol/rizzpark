@@ -44,6 +44,7 @@ export default function App() {
   const [showMap,        setShowMap]        = useState(false);
   const [showMapIntro,   setShowMapIntro]   = useState(false);
   const [allPins,        setAllPins]        = useState([]);
+  const [activePinCode,  setActivePinCode]  = useState(null);
 
   const toastId      = useRef(0);
   const prevSlotsRef = useRef([]);
@@ -76,11 +77,16 @@ export default function App() {
     return unsubscribe;
   }, [fcm.token, fcm.onMessage]);
 
-  // Load Firebase geo pins for the map
+  // Load Firebase geo pins and active Pi pin for the map
   useEffect(() => {
-    fetch('https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app/map_pins.json')
+    const base = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
+    fetch(`${base}/map_pins.json`)
       .then(r => r.json())
       .then(data => { if (data && typeof data === 'object') setAllPins(Object.values(data)); })
+      .catch(() => {});
+    fetch(`${base}/pi_config/active_pin.json`)
+      .then(r => r.json())
+      .then(data => { if (typeof data === 'string') setActivePinCode(data); })
       .catch(() => {});
   }, []);
 
@@ -171,7 +177,7 @@ export default function App() {
 
       <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} />
 
-      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} />}
+      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} activePinCode={activePinCode} />}
 
       <div className="main" style={showMapIntro ? { display: 'none' } : {}}>
         <Sidebar
@@ -207,7 +213,7 @@ export default function App() {
         </div>
       </div>
 
-      {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} />}
+      {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePinCode={activePinCode} />}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
       {/* <ConsolePanel logs={logs} onClear={clear} /> */}

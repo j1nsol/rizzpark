@@ -10,10 +10,18 @@ const parkingIcon = L.icon({
   popupAnchor: [0, -44],
 });
 
+const unavailableIcon = L.divIcon({
+  html: '<img src="/topbar-logo.png" style="width:40px;height:40px;filter:grayscale(1);opacity:0.55;" />',
+  className: '',
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -44],
+});
+
 const DEFAULT_CENTER = [10.3157, 123.8854];
 const MAP_ZOOM = 14 ;
 
-export default function GoogleMapView({ onClose, pins = [] }) {
+export default function GoogleMapView({ onClose, pins = [], activePinCode = null }) {
   const navigate        = useNavigate();
   const mapRef          = useRef(null);
   const instanceRef     = useRef(null);
@@ -52,19 +60,15 @@ export default function GoogleMapView({ onClose, pins = [] }) {
 
   // Render Firebase-saved parking location pins
   useEffect(() => {
-    if (!instanceRef.current || !pins.length) return;
+    if (!instanceRef.current) return;
 
-    // Remove old Firebase markers not in the current pins list
-    const currentCodes = new Set(pins.map(p => p.pinCode));
-    fbMarkersRef.current.forEach((marker, code) => {
-      if (!currentCodes.has(code)) {
-        marker.remove();
-        fbMarkersRef.current.delete(code);
-      }
-    });
+    // Clear and rebuild all markers so icon/popup reflects latest activePinCode
+    fbMarkersRef.current.forEach(marker => marker.remove());
+    fbMarkersRef.current.clear();
 
     pins.forEach(pin => {
-      if (fbMarkersRef.current.has(pin.pinCode)) return;
+      const isAvailable = activePinCode !== null && pin.pinCode === activePinCode;
+      const icon = isAvailable ? parkingIcon : unavailableIcon;
 
       const wrap = document.createElement('div');
       wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:150px';
@@ -77,22 +81,33 @@ export default function GoogleMapView({ onClose, pins = [] }) {
       code.style.cssText = 'font-family:monospace;font-size:11px;color:#64748b';
       code.textContent = `📍 ${pin.pinCode}`;
 
-      const navBtn = document.createElement('button');
-      navBtn.textContent = 'View Parking →';
-      navBtn.style.cssText = 'margin-top:4px;padding:5px 12px;border-radius:6px;border:1px solid #10b98144;background:#10b98115;color:#10b981;font-family:monospace;font-size:11px;cursor:pointer;font-weight:700';
-      navBtn.onclick = () => navigate(`/${pin.pinCode}`);
-
       wrap.appendChild(title);
       wrap.appendChild(code);
+
+      if (!isAvailable) {
+        const noFeed = document.createElement('div');
+        noFeed.style.cssText = 'font-family:sans-serif;font-size:11px;color:#94a3b8;margin-top:1px';
+        noFeed.textContent = '📷 No camera feed';
+        wrap.appendChild(noFeed);
+      }
+
+      const navBtn = document.createElement('button');
+      navBtn.textContent = 'View Parking →';
+      if (isAvailable) {
+        navBtn.style.cssText = 'margin-top:4px;padding:5px 12px;border-radius:6px;border:1px solid #10b98144;background:#10b98115;color:#10b981;font-family:monospace;font-size:11px;cursor:pointer;font-weight:700';
+      } else {
+        navBtn.style.cssText = 'margin-top:4px;padding:5px 12px;border-radius:6px;border:1px solid #94a3b844;background:#94a3b815;color:#94a3b8;font-family:monospace;font-size:11px;cursor:pointer;font-weight:700';
+      }
+      navBtn.onclick = () => navigate(`/${pin.pinCode}`);
       wrap.appendChild(navBtn);
 
-      const marker = L.marker([pin.lat, pin.lng], { icon: parkingIcon })
+      const marker = L.marker([pin.lat, pin.lng], { icon })
         .addTo(instanceRef.current)
         .bindPopup(wrap);
 
       fbMarkersRef.current.set(pin.pinCode, marker);
     });
-  }, [pins]);
+  }, [pins, activePinCode]);
 
   async function handleSearch(e) {
     e.preventDefault();
