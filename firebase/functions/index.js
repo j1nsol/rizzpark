@@ -121,7 +121,7 @@ exports.onSlotStatusChange = functions.database
             if (!resp.success) {
               const token = batches[batchIndex][tokenIndex];
               invalidTokens.push(token);
-              console.log(`Failed to send to token ${token}:`, resp.error);
+              console.log(`Failed to send to token ${token.slice(0, 20)}...: ${resp.error?.code} — ${resp.error?.message}`);
             }
           });
         } else {
@@ -238,7 +238,11 @@ exports.onPinSlotStatusChange = functions.database
           successCount += result.value.successCount;
           failureCount += result.value.failureCount;
           result.value.responses.forEach((resp, tokenIndex) => {
-            if (!resp.success) invalidTokens.push(batches[batchIndex][tokenIndex]);
+            if (!resp.success) {
+              const token = batches[batchIndex][tokenIndex];
+              invalidTokens.push(token);
+              console.log(`[${pinCode}] Failed token ${token.slice(0, 20)}...: ${resp.error?.code} — ${resp.error?.message}`);
+            }
           });
         } else {
           failureCount += batches[batchIndex].length;
