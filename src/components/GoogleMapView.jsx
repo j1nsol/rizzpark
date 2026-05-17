@@ -18,7 +18,7 @@ const unavailableIcon = L.divIcon({
   popupAnchor: [0, -44],
 });
 
-const DEFAULT_CENTER = [10.3157, 123.8854];
+const DEFAULT_CENTER = [10.294722999317614, 123.88045512649316];
 const MAP_ZOOM = 14 ;
 
 const PIN_ACTIVE_TTL = 45_000; // ms — pin is live if heartbeat is within this window
