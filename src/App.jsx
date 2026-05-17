@@ -16,7 +16,7 @@ import { useFCM }            from './hooks/useFCM';
 import { useConsoleLog }     from './hooks/useConsoleLog';
 import ConsolePanel          from './components/ConsolePanel';
 import {
-  canNotify, isGranted, requestPerm, fireNotif, ONBOARDING_KEY,
+  canNotify, isGranted, requestPerm, fireNotif, fireFullNotif, ONBOARDING_KEY,
 } from './utils/parking';
 import { setSlotOverride } from './utils/firebase';
 import { getFirebasePath } from './config/modeConfig';
@@ -101,16 +101,18 @@ export default function App() {
       prevById[s.id]?.status === 'occupied' && s.status === 'vacant'
     );
     
-    changedSlots.forEach(s => { 
-      // Show browser notification as fallback
-      fireNotif(s); 
-      // Show in-app toast
-      spawnToast(s.id, s.row); 
-      
-      // FCM push notifications are handled by Cloud Functions
-      // when slot status changes in Firebase Realtime Database
+    changedSlots.forEach(s => {
+      fireNotif(s);
+      spawnToast(s.id, s.row);
     });
-    
+
+    const prevOccupied = prevSlotsRef.current.filter(s => s.status === 'occupied').length;
+    const nowOccupied  = slots.filter(s => s.status === 'occupied').length;
+    const total = slots.length;
+    if (total > 0 && nowOccupied === total && prevOccupied < total) {
+      fireFullNotif('Ground Floor');
+    }
+
     prevSlotsRef.current = slots;
   }, [slots]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -175,7 +177,7 @@ export default function App() {
         <OnboardingOverlay onDismiss={() => { setShowOnboarding(false); setShowMapIntro(true); }} />
       )}
 
-      <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} />
+      <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} pins={allPins} />
 
       {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} activePins={activePins} />}
 

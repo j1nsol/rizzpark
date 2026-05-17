@@ -277,6 +277,54 @@
   background-color: #d1d5db;
 }
 
+/* ── Pin subscription list ───────────────────────────────────────────────────── */
+.pin-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.pin-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+}
+
+.pin-check-item:hover {
+  background: #f9fafb;
+}
+
+.pin-check-item.all-item {
+  font-weight: 500;
+  color: #1f2937;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 4px;
+  padding-bottom: 12px;
+}
+
+.pin-check-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent, #F5A623);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pin-check-code {
+  margin-left: auto;
+  font-size: 11px;
+  color: #9ca3af;
+  font-family: monospace;
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .notification-settings-card {
@@ -311,4 +359,5 @@
     flex-direction: column;
     gap: 12px;
   }
+
 }

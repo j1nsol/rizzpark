@@ -1,35 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useFCM } from '../hooks/useFCM';
+import { getNotificationSettings } from '../utils/parking';
+import { saveTokenSubscribedPins } from '../utils/firebase';
 
 /**
- * NotificationSettings component for managing user notification preferences
- * Allows users to control push notification behavior and preferences
+ * @param {{ onClose: () => void, pins?: Array<{pinCode: string, name: string}> }} props
  */
-export default function NotificationSettings({ onClose }) {
+export default function NotificationSettings({ onClose, pins = [] }) {
   const fcm = useFCM();
-  const [settings, setSettings] = useState({
-    enabled: true,
-    slotAvailable: true,
-    quietHours: false,
-    quietStart: '22:00',
-    quietEnd: '08:00',
-    soundEnabled: true,
-    vibrationEnabled: true,
-  });
-
-  // Load settings from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('rizzpark_notification_settings');
-    if (saved) {
-      try {
-        setSettings(JSON.parse(saved));
-      } catch (error) {
-        console.error('Failed to load notification settings:', error);
-      }
+  const [settings, setSettings] = useState(getNotificationSettings);
+  const [allLocations, setAllLocations] = useState(
+    () => {
+      const s = getNotificationSettings();
+      return !s.subscribedPins || s.subscribedPins.includes('all');
     }
+  );
+
+  useEffect(() => {
+    const s = getNotificationSettings();
+    setSettings(s);
+    setAllLocations(!s.subscribedPins || s.subscribedPins.includes('all'));
   }, []);
 
-  // Save settings to localStorage
   const saveSettings = (newSettings) => {
     setSettings(newSettings);
     localStorage.setItem('rizzpark_notification_settings', JSON.stringify(newSettings));
@@ -39,25 +31,41 @@ export default function NotificationSettings({ onClose }) {
     saveSettings({ ...settings, [key]: value });
   };
 
+  async function handlePinSubscription(newSubs) {
+    const newSettings = { ...settings, subscribedPins: newSubs };
+    saveSettings(newSettings);
+    await saveTokenSubscribedPins(fcm.token, newSubs);
+  }
+
+  function toggleAllLocations(checked) {
+    setAllLocations(checked);
+    if (checked) {
+      handlePinSubscription(['all']);
+    } else {
+      handlePinSubscription(pins.map(p => p.pinCode));
+    }
+  }
+
+  function togglePin(pinCode) {
+    const current = settings.subscribedPins || ['all'];
+    const currentPins = current.includes('all') ? pins.map(p => p.pinCode) : current;
+    const next = currentPins.includes(pinCode)
+      ? currentPins.filter(p => p !== pinCode)
+      : [...currentPins, pinCode];
+    handlePinSubscription(next.length > 0 ? next : pins.map(p => p.pinCode));
+  }
+
   const handleEnableNotifications = async () => {
     try {
       await fcm.requestPermission();
       handleSettingChange('enabled', true);
-    } catch (error) {
-      console.error('Failed to enable notifications:', error);
-    }
-  };
-
-  const handleDisableNotifications = () => {
-    handleSettingChange('enabled', false);
+    } catch {}
   };
 
   const isQuietHours = () => {
     if (!settings.quietHours) return false;
-    
     const now = new Date();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
     return currentTime >= settings.quietStart || currentTime <= settings.quietEnd;
   };
 
@@ -84,18 +92,11 @@ export default function NotificationSettings({ onClose }) {
             </label>
             <div className="toggle-switch">
               {settings.enabled ? (
-                <button 
-                  className="toggle-btn active"
-                  onClick={handleDisableNotifications}
-                >
+                <button className="toggle-btn active" onClick={() => handleSettingChange('enabled', false)}>
                   ON
                 </button>
               ) : (
-                <button 
-                  className="toggle-btn"
-                  onClick={handleEnableNotifications}
-                  disabled={!fcm.isSupported}
-                >
+                <button className="toggle-btn" onClick={handleEnableNotifications} disabled={!fcm.isSupported}>
                   OFF
                 </button>
               )}
@@ -107,16 +108,14 @@ export default function NotificationSettings({ onClose }) {
               {/* Notification types */}
               <div className="setting-section">
                 <h4>Notification Types</h4>
-                
+
                 <div className="setting-item">
                   <label className="setting-label">
                     <span>Slot Available</span>
-                    <span className="setting-description">
-                      When a parking slot becomes available
-                    </span>
+                    <span className="setting-description">When a parking slot becomes available</span>
                   </label>
                   <div className="toggle-switch">
-                    <button 
+                    <button
                       className={`toggle-btn ${settings.slotAvailable ? 'active' : ''}`}
                       onClick={() => handleSettingChange('slotAvailable', !settings.slotAvailable)}
                     >
@@ -124,21 +123,66 @@ export default function NotificationSettings({ onClose }) {
                     </button>
                   </div>
                 </div>
+
+                <div className="setting-item">
+                  <label className="setting-label">
+                    <span>Parking Full</span>
+                    <span className="setting-description">When all slots are occupied</span>
+                  </label>
+                  <div className="toggle-switch">
+                    <button
+                      className={`toggle-btn ${settings.parkingFull ? 'active' : ''}`}
+                      onClick={() => handleSettingChange('parkingFull', !settings.parkingFull)}
+                    >
+                      {settings.parkingFull ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* Watched locations */}
+              {pins.length > 0 && (
+                <div className="setting-section">
+                  <h4>Watched Locations</h4>
+
+                  <label className="pin-check-item all-item">
+                    <input
+                      type="checkbox"
+                      checked={allLocations}
+                      onChange={e => toggleAllLocations(e.target.checked)}
+                    />
+                    <span>All locations</span>
+                  </label>
+
+                  {!allLocations && (
+                    <div className="pin-check-list">
+                      {pins.map(pin => (
+                        <label key={pin.pinCode} className="pin-check-item">
+                          <input
+                            type="checkbox"
+                            checked={(settings.subscribedPins || []).includes(pin.pinCode)}
+                            onChange={() => togglePin(pin.pinCode)}
+                          />
+                          <span>{pin.name || pin.pinCode}</span>
+                          <span className="pin-check-code">{pin.pinCode}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Quiet hours */}
               <div className="setting-section">
                 <h4>Quiet Hours</h4>
-                
+
                 <div className="setting-item">
                   <label className="setting-label">
                     <span>Enable Quiet Hours</span>
-                    <span className="setting-description">
-                      Suppress notifications during specified hours
-                    </span>
+                    <span className="setting-description">Suppress notifications during specified hours</span>
                   </label>
                   <div className="toggle-switch">
-                    <button 
+                    <button
                       className={`toggle-btn ${settings.quietHours ? 'active' : ''}`}
                       onClick={() => handleSettingChange('quietHours', !settings.quietHours)}
                     >
@@ -151,16 +195,16 @@ export default function NotificationSettings({ onClose }) {
                   <div className="time-range">
                     <div className="time-input">
                       <label>From:</label>
-                      <input 
-                        type="time" 
+                      <input
+                        type="time"
                         value={settings.quietStart}
                         onChange={(e) => handleSettingChange('quietStart', e.target.value)}
                       />
                     </div>
                     <div className="time-input">
                       <label>To:</label>
-                      <input 
-                        type="time" 
+                      <input
+                        type="time"
                         value={settings.quietEnd}
                         onChange={(e) => handleSettingChange('quietEnd', e.target.value)}
                       />
@@ -172,16 +216,14 @@ export default function NotificationSettings({ onClose }) {
               {/* Device settings */}
               <div className="setting-section">
                 <h4>Device Settings</h4>
-                
+
                 <div className="setting-item">
                   <label className="setting-label">
                     <span>Sound</span>
-                    <span className="setting-description">
-                      Play sound with notifications
-                    </span>
+                    <span className="setting-description">Play sound with notifications</span>
                   </label>
                   <div className="toggle-switch">
-                    <button 
+                    <button
                       className={`toggle-btn ${settings.soundEnabled ? 'active' : ''}`}
                       onClick={() => handleSettingChange('soundEnabled', !settings.soundEnabled)}
                     >
@@ -193,12 +235,10 @@ export default function NotificationSettings({ onClose }) {
                 <div className="setting-item">
                   <label className="setting-label">
                     <span>Vibration</span>
-                    <span className="setting-description">
-                      Vibrate on mobile devices
-                    </span>
+                    <span className="setting-description">Vibrate on mobile devices</span>
                   </label>
                   <div className="toggle-switch">
-                    <button 
+                    <button
                       className={`toggle-btn ${settings.vibrationEnabled ? 'active' : ''}`}
                       onClick={() => handleSettingChange('vibrationEnabled', !settings.vibrationEnabled)}
                     >
@@ -238,7 +278,7 @@ export default function NotificationSettings({ onClose }) {
           {!fcm.isSupported && (
             <div className="not-supported">
               <p>
-                Push notifications are not supported on this device or browser. 
+                Push notifications are not supported on this device or browser.
                 Please use a modern browser that supports Service Workers and Web Push API.
               </p>
             </div>
@@ -246,9 +286,7 @@ export default function NotificationSettings({ onClose }) {
         </div>
 
         <div className="settings-footer">
-          <button className="btn btn-primary" onClick={onClose}>
-            Done
-          </button>
+          <button className="btn btn-primary" onClick={onClose}>Done</button>
         </div>
       </div>
     </div>

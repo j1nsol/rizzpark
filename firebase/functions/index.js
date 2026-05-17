@@ -60,12 +60,13 @@ exports.onSlotStatusChange = functions.database
         },
       };
 
-      // Send to all tokens
+      // Send to subscribed tokens only (legacy path treated as pinCode null — 'all' subscribers get it)
       const validTokens = Object.keys(tokens).filter(token => {
         const tokenData = tokens[token];
-        // Filter out old tokens (older than 30 days)
         const tokenAge = Date.now() - (tokenData.timestamp || 0);
-        return tokenAge < 30 * 24 * 60 * 60 * 1000; // 30 days
+        if (tokenAge >= 30 * 24 * 60 * 60 * 1000) return false;
+        const subs = tokenData.subscribedPins;
+        return !subs || subs.includes('all');
       });
 
       if (validTokens.length === 0) {
@@ -188,8 +189,12 @@ exports.onPinSlotStatusChange = functions.database
       const tokens = tokensSnapshot.val() || {};
 
       const validTokens = Object.keys(tokens).filter(token => {
-        const tokenAge = Date.now() - (tokens[token].timestamp || 0);
-        return tokenAge < 30 * 24 * 60 * 60 * 1000;
+        const tokenData = tokens[token];
+        const tokenAge = Date.now() - (tokenData.timestamp || 0);
+        if (tokenAge >= 30 * 24 * 60 * 60 * 1000) return false;
+        const subs = tokenData.subscribedPins;
+        if (!subs || subs.includes('all')) return true;
+        return subs.includes(pinCode);
       });
 
       if (validTokens.length === 0) {
@@ -258,6 +263,162 @@ exports.onPinSlotStatusChange = functions.database
       return null;
     } catch (error) {
       console.error('Error sending pin slot notification:', error);
+      throw error;
+    }
+  });
+
+// ── Parking Full Trigger (pin-specific) ──────────────────────────────────────
+// Fires when any slot in a Pi location becomes occupied.
+// If ALL slots are now occupied, sends a "parking full" push notification.
+exports.onPinParkingFull = functions.database
+  .ref('/locations/{pinCode}/slots/{slotId}')
+  .onUpdate(async (change, context) => {
+    const { pinCode } = context.params;
+    const after = change.after.val();
+
+    const afterStatus = after?.status?.toLowerCase() || after?.manualStatus?.toLowerCase();
+    if (afterStatus !== 'occupied') return null;
+
+    // Read all slots for this pin to check if fully occupied
+    const allSlotsSnap = await db.ref(`/locations/${pinCode}/slots`).once('value');
+    const allSlots = allSlotsSnap.val() || {};
+    const slotValues = Object.values(allSlots);
+    if (slotValues.length === 0) return null;
+
+    const allOccupied = slotValues.every(s => {
+      const st = s?.status?.toLowerCase() || s?.manualStatus?.toLowerCase();
+      return st === 'occupied';
+    });
+    if (!allOccupied) return null;
+
+    console.log(`[${pinCode}] All slots occupied — sending parking full notification`);
+
+    try {
+      const tokensSnapshot = await db.ref('fcm_tokens').once('value');
+      const tokens = tokensSnapshot.val() || {};
+
+      const validTokens = Object.keys(tokens).filter(token => {
+        const tokenData = tokens[token];
+        const tokenAge = Date.now() - (tokenData.timestamp || 0);
+        if (tokenAge >= 30 * 24 * 60 * 60 * 1000) return false;
+        const subs = tokenData.subscribedPins;
+        if (!subs || subs.includes('all')) return true;
+        return subs.includes(pinCode);
+      });
+
+      if (validTokens.length === 0) return null;
+
+      const title = 'Rizz Park — Parking Full!';
+      const body  = `[${pinCode}] All parking slots are now occupied.`;
+      const tag   = `full-${pinCode}`;
+
+      const batchSize = 500;
+      const batches = [];
+      for (let i = 0; i < validTokens.length; i += batchSize) {
+        batches.push(validTokens.slice(i, i + batchSize));
+      }
+
+      await Promise.allSettled(
+        batches.map(batch =>
+          messaging.sendEachForMulticast({
+            tokens: batch,
+            notification: { title, body },
+            webpush: {
+              notification: {
+                title,
+                body,
+                icon:  '/logo192.png',
+                badge: '/favicon.ico',
+                tag,
+                requireInteraction: false,
+              },
+              fcmOptions: { link: `https://rizzpark.vercel.app/${pinCode}` },
+            },
+            data: { pinCode, type: 'parking_full', timestamp: Date.now().toString() },
+          })
+        )
+      );
+
+      console.log(`[${pinCode}] Parking full notification sent to ${validTokens.length} tokens`);
+      return null;
+    } catch (error) {
+      console.error(`[${pinCode}] Error sending parking full notification:`, error);
+      throw error;
+    }
+  });
+
+// ── Parking Full Trigger (legacy /parking/slots path) ─────────────────────────
+exports.onParkingFull = functions.database
+  .ref('/parking/slots/{slotId}')
+  .onUpdate(async (change, context) => {
+    const after = change.after.val();
+
+    const afterStatus = after?.status?.toLowerCase() || after?.manualStatus?.toLowerCase();
+    if (afterStatus !== 'occupied') return null;
+
+    // Read all slots to check if fully occupied
+    const allSlotsSnap = await db.ref('/parking/slots').once('value');
+    const allSlots = allSlotsSnap.val() || {};
+    const slotValues = Object.values(allSlots);
+    if (slotValues.length === 0) return null;
+
+    const allOccupied = slotValues.every(s => {
+      const st = s?.status?.toLowerCase() || s?.manualStatus?.toLowerCase();
+      return st === 'occupied';
+    });
+    if (!allOccupied) return null;
+
+    console.log('All slots occupied on main lot — sending parking full notification');
+
+    try {
+      const tokensSnapshot = await db.ref('fcm_tokens').once('value');
+      const tokens = tokensSnapshot.val() || {};
+
+      const validTokens = Object.keys(tokens).filter(token => {
+        const tokenData = tokens[token];
+        const tokenAge = Date.now() - (tokenData.timestamp || 0);
+        if (tokenAge >= 30 * 24 * 60 * 60 * 1000) return false;
+        const subs = tokenData.subscribedPins;
+        return !subs || subs.includes('all');
+      });
+
+      if (validTokens.length === 0) return null;
+
+      const title = 'Rizz Park — Parking Full!';
+      const body  = 'Ground Floor is completely full — no slots available.';
+      const tag   = 'full-ground-floor';
+
+      const batchSize = 500;
+      const batches = [];
+      for (let i = 0; i < validTokens.length; i += batchSize) {
+        batches.push(validTokens.slice(i, i + batchSize));
+      }
+
+      await Promise.allSettled(
+        batches.map(batch =>
+          messaging.sendEachForMulticast({
+            tokens: batch,
+            notification: { title, body },
+            webpush: {
+              notification: {
+                title,
+                body,
+                icon:  '/logo192.png',
+                badge: '/favicon.ico',
+                tag,
+                requireInteraction: false,
+              },
+              fcmOptions: { link: 'https://rizzpark.vercel.app/' },
+            },
+            data: { type: 'parking_full', timestamp: Date.now().toString() },
+          })
+        )
+      );
+
+      console.log(`Parking full notification sent to ${validTokens.length} tokens`);
+      return null;
+    } catch (error) {
+      console.error('Error sending parking full notification:', error);
       throw error;
     }
   });

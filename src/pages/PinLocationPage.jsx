@@ -9,7 +9,7 @@ import { usePinFirebaseSlots } from '../hooks/usePinFirebaseSlots';
 
 import { setPinSlotOverride, clearPinSlotOverride } from '../utils/firebase';
 import { useFCM } from '../hooks/useFCM';
-import { canNotify, fireNotif, requestPerm } from '../utils/parking';
+import { canNotify, fireNotif, fireFullNotif, requestPerm } from '../utils/parking';
 
 const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
 
@@ -52,7 +52,15 @@ export default function PinLocationPage() {
     const prevById = Object.fromEntries(prevSlotsRef.current.map(s => [s.id, s]));
     slots
       .filter(s => prevById[s.id]?.status === 'occupied' && s.status === 'vacant')
-      .forEach(s => fireNotif(s));
+      .forEach(s => fireNotif(s, pinCode));
+
+    const prevOccupied = prevSlotsRef.current.filter(s => s.status === 'occupied').length;
+    const nowOccupied  = slots.filter(s => s.status === 'occupied').length;
+    const total = slots.length;
+    if (total > 0 && nowOccupied === total && prevOccupied < total) {
+      fireFullNotif(pinName ?? pinCode, pinCode);
+    }
+
     prevSlotsRef.current = slots;
   }, [slots]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -95,7 +103,7 @@ export default function PinLocationPage() {
 
   return (
     <div className="app">
-      <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} />
+      <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} pins={allPins} />
 
 
       <div className="main">

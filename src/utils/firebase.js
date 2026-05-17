@@ -116,6 +116,17 @@ export async function deleteFCMToken(token) {
   }
 }
 
+// Saves the user's pin subscription list directly onto their FCM token record
+// so Cloud Functions can filter background push by subscription.
+export async function saveTokenSubscribedPins(token, subscribedPins) {
+  if (!token) return;
+  try {
+    await update(ref(db, `fcm_tokens/${token}`), { subscribedPins });
+  } catch (error) {
+    console.error('Failed to save subscribed pins to Firebase:', error);
+  }
+}
+
 // ── Map Pin Helpers ───────────────────────────────────────────────────────────
 
 export async function saveMapPin(pinCode, name, lat, lng) {
