@@ -33,6 +33,16 @@ export function useFCM() {
       });
   }, [isSupported]);
 
+  // Auto-register token on load when the user already granted permission.
+  // Without this, refreshing the page leaves fcm_tokens empty in Firebase
+  // and Cloud Functions have no device to send push notifications to.
+  useEffect(() => {
+    if (!isSupported || !swRegistration || Notification.permission !== 'granted') return;
+    requestFCMToken(swRegistration)
+      .then(fcmToken => { if (fcmToken) setToken(fcmToken); })
+      .catch(err => console.error('FCM auto-registration failed:', err));
+  }, [isSupported, swRegistration]);
+
   // Request permission and get token, passing the SW registration to getToken
   const requestPermission = useCallback(async () => {
     if (!isSupported) throw new Error('Push notifications not supported');
