@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import '../styles/global.css';
 import Topbar        from '../components/Topbar';
@@ -7,18 +7,26 @@ import ParkingCardGrid from '../components/ParkingCardGrid';
 import GoogleMapView from '../components/GoogleMapView';
 import { usePinFirebaseSlots } from '../hooks/usePinFirebaseSlots';
 import { setPinSlotOverride, clearPinSlotOverride } from '../utils/firebase';
+import { useFCM } from '../hooks/useFCM';
+import { canNotify, fireNotif, requestPerm } from '../utils/parking';
 
 const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 export default function PinLocationPage() {
   const { pinCode } = useParams();
   const { slots, fbStatus, lastUpdated, pinName } = usePinFirebaseSlots(pinCode);
+  const fcm = useFCM();
 
-  const [selectedId, setSelectedId] = useState(null);
-  const [filter,     setFilter]     = useState('all');
-  const [showMap,    setShowMap]    = useState(false);
-  const [allPins,      setAllPins]      = useState([]);
-  const [activePins, setActivePins] = useState(null);
+  const [selectedId,  setSelectedId]  = useState(null);
+  const [filter,      setFilter]      = useState('all');
+  const [showMap,     setShowMap]     = useState(false);
+  const [allPins,     setAllPins]     = useState([]);
+  const [activePins,  setActivePins]  = useState(null);
+  const [notifPerm,   setNotifPerm]   = useState(
+    canNotify() ? Notification.permission : 'unavailable'
+  );
+
+  const prevSlotsRef = useRef([]);
 
   // Load all Firebase pins and active Pi pins for the map
   useEffect(() => {
@@ -33,6 +41,32 @@ export default function PinLocationPage() {
       .then(data => { if (data && typeof data === 'object') setActivePins(data); })
       .catch(() => {});
   }, []);
+
+  // Detect occupied→vacant transitions and fire browser notifications
+  useEffect(() => {
+    if (!prevSlotsRef.current.length) {
+      prevSlotsRef.current = slots;
+      return;
+    }
+    const prevById = Object.fromEntries(prevSlotsRef.current.map(s => [s.id, s]));
+    slots
+      .filter(s => prevById[s.id]?.status === 'occupied' && s.status === 'vacant')
+      .forEach(s => fireNotif(s));
+    prevSlotsRef.current = slots;
+  }, [slots]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleNotif() {
+    if (notifPerm === 'granted') return;
+    try {
+      if (fcm.isSupported) {
+        await fcm.requestPermission();
+        setNotifPerm('granted');
+      } else {
+        const ok = await requestPerm();
+        setNotifPerm(ok ? 'granted' : 'denied');
+      }
+    } catch {}
+  }
 
   const total    = slots.length;
   const vacant   = slots.filter(s => s.status === 'vacant').length;
@@ -60,7 +94,7 @@ export default function PinLocationPage() {
 
   return (
     <div className="app">
-      <Topbar notifPerm="unavailable" onNotifClick={() => {}} />
+      <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} />
 
       <div className="main">
         <Sidebar
