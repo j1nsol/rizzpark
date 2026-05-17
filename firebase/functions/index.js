@@ -82,10 +82,24 @@ exports.onSlotStatusChange = functions.database
       }
 
       const results = await Promise.allSettled(
-        batches.map(batch => 
+        batches.map(batch =>
           messaging.sendMulticast({
             tokens: batch,
-            notification: payload.notification,
+            notification: {
+              title: payload.notification.title,
+              body:  payload.notification.body,
+            },
+            webpush: {
+              notification: {
+                title:             payload.notification.title,
+                body:              payload.notification.body,
+                icon:              '/logo192.png',
+                badge:             '/favicon.ico',
+                tag:               payload.notification.tag,
+                requireInteraction: true,
+              },
+              fcmOptions: { link: '/' },
+            },
             data: payload.data,
           })
         )
@@ -191,17 +205,25 @@ exports.onPinSlotStatusChange = functions.database
         batches.push(validTokens.slice(i, i + batchSize));
       }
 
+      const title = `Rizz Park — Slot Available!`;
+      const body  = `[${pinCode}] Slot ${slotId} (Row ${row}) just opened up.`;
+      const tag   = `slot-${pinCode}-${slotId}`;
+
       const results = await Promise.allSettled(
         batches.map(batch =>
           messaging.sendMulticast({
             tokens: batch,
-            notification: {
-              title: `Rizz Park — Slot Available!`,
-              body:  `[${pinCode}] Slot ${slotId} (Row ${row}) just opened up.`,
-              icon:  '/logo192.png',
-              badge: '/favicon.ico',
-              tag:   `slot-${pinCode}-${slotId}`,
-              requireInteraction: true,
+            notification: { title, body },
+            webpush: {
+              notification: {
+                title,
+                body,
+                icon:              '/logo192.png',
+                badge:             '/favicon.ico',
+                tag,
+                requireInteraction: true,
+              },
+              fcmOptions: { link: `/${pinCode}` },
             },
             data: { slotId, row, pinCode, type: 'slot_available', timestamp: Date.now().toString() },
           })
@@ -316,7 +338,21 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
 
     const response = await messaging.sendMulticast({
       tokens: validTokens,
-      notification: payload.notification,
+      notification: {
+        title: payload.notification.title,
+        body:  payload.notification.body,
+      },
+      webpush: {
+        notification: {
+          title:             payload.notification.title,
+          body:              payload.notification.body,
+          icon:              '/logo192.png',
+          badge:             '/favicon.ico',
+          tag:               payload.notification.tag,
+          requireInteraction: false,
+        },
+        fcmOptions: { link: '/' },
+      },
       data: payload.data,
     });
 

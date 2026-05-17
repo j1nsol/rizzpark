@@ -22,18 +22,18 @@ const messaging = firebase.messaging();
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
   console.log('Received background message:', payload);
-  
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
+
+  const title = payload.notification?.title || payload.data?.title || 'Rizz Park';
+  const body  = payload.notification?.body  || payload.data?.body  || 'A parking slot is now available.';
+
+  self.registration.showNotification(title, {
+    body,
     icon: '/favicon.ico',
     badge: '/favicon.ico',
     tag: 'parking-notification',
     requireInteraction: true,
-    data: payload.data
-  };
-
-  self.registration.showNotification(notificationTitle, notificationOptions);
+    data: payload.data,
+  });
 });
 
 // Handle notification click
