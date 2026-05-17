@@ -69,15 +69,16 @@ export default function Sidebar({
             <div className="s-sub">in use</div>
           </div>
 
-          {reserved > 0 && (
-            <div className="stat-box" style={{ borderColor: 'var(--reserved-border)', background: 'var(--reserved-bg)' }}>
-              <div className="s-label" style={{ color: 'var(--reserved)' }}>Reserved</div>
-              <div className="s-val" style={{ color: 'var(--reserved)' }}>{reserved}</div>
-              <div className="s-sub" style={{ color: 'var(--reserved)' }}>pre-booked</div>
-            </div>
-          )}
+          <div
+            className="stat-box"
+            style={reserved > 0 ? { borderColor: 'var(--reserved-border)', background: 'var(--reserved-bg)' } : {}}
+          >
+            <div className="s-label" style={reserved > 0 ? { color: 'var(--reserved)' } : {}}>Reserved</div>
+            <div className="s-val" style={reserved > 0 ? { color: 'var(--reserved)' } : {}}>{reserved}</div>
+            <div className="s-sub" style={reserved > 0 ? { color: 'var(--reserved)' } : {}}>pre-booked</div>
+          </div>
 
-          <div className="stat-box full">
+          <div className="stat-box accent">
             <div className="s-label">Occupancy</div>
             <div className="s-val">
               {occPct}<span style={{ fontSize: '15px', fontWeight: 400 }}>%</span>
