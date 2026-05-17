@@ -175,6 +175,7 @@ body::before {
 .grid-area {
   padding: 24px; overflow: auto;
   display: flex; flex-direction: column; gap: 20px;
+  min-width: 0;
 }
 
 .grid-topbar {
@@ -215,7 +216,7 @@ body::before {
 }
 .road-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); background: var(--road); padding: 0 8px; position: relative; z-index: 1; }
 
-.slot-row-wrap { display: flex; gap: 10px; padding: 8px 0; justify-content: center; }
+.slot-row-wrap { display: flex; gap: 10px; padding: 8px 0; justify-content: center; flex-wrap: wrap; }
 
 /* Slot card */
 .slot-card {
