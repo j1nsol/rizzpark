@@ -18,7 +18,8 @@ const ADMIN_C = {
 function CarIconSVG({ color }) {
   return (
     <svg viewBox="0 0 40 26" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style={{ width: 32, height: 22, display: 'block' }}>
+      className="slot-icon"
+      style={{ display: 'block' }}>
       <rect x="1"  y="9"  width="38" height="14" rx="4"   fill={color} opacity="0.9" />
       <path d="M8 9 L13 2 H27 L32 9" stroke={color} strokeWidth="1.5" fill={color} opacity="0.7" />
       <circle cx="10" cy="22" r="3.5" fill="white" opacity="0.9" />
