@@ -65,6 +65,7 @@ exports.onSlotStatusChange = functions.database
         const tokenData = tokens[token];
         const tokenAge = Date.now() - (tokenData.timestamp || 0);
         if (tokenAge >= 30 * 24 * 60 * 60 * 1000) return false;
+        if (tokenData.suppressed === true) return false;
         const subs = tokenData.subscribedPins;
         return !subs || subs.includes('all');
       });
@@ -192,6 +193,7 @@ exports.onPinSlotStatusChange = functions.database
         const tokenData = tokens[token];
         const tokenAge = Date.now() - (tokenData.timestamp || 0);
         if (tokenAge >= 30 * 24 * 60 * 60 * 1000) return false;
+        if (tokenData.suppressed === true) return false;
         const subs = tokenData.subscribedPins;
         if (!subs || subs.includes('all')) return true;
         return subs.includes(pinCode);
@@ -301,6 +303,7 @@ exports.onPinParkingFull = functions.database
         const tokenData = tokens[token];
         const tokenAge = Date.now() - (tokenData.timestamp || 0);
         if (tokenAge >= 30 * 24 * 60 * 60 * 1000) return false;
+        if (tokenData.suppressed === true) return false;
         const subs = tokenData.subscribedPins;
         if (!subs || subs.includes('all')) return true;
         return subs.includes(pinCode);
@@ -378,6 +381,7 @@ exports.onParkingFull = functions.database
         const tokenData = tokens[token];
         const tokenAge = Date.now() - (tokenData.timestamp || 0);
         if (tokenAge >= 30 * 24 * 60 * 60 * 1000) return false;
+        if (tokenData.suppressed === true) return false;
         const subs = tokenData.subscribedPins;
         return !subs || subs.includes('all');
       });

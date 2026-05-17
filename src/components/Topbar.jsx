@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import NotificationSettings from './NotificationSettings';
 
-export default function Topbar({ notifPerm, onNotifClick, pins = [] }) {
+export default function Topbar({ notifPerm, onNotifClick, pins = [], suppressed = false, onSuppressToggle }) {
   const [showSettings, setShowSettings] = useState(false);
 
   const notifLabel =
@@ -26,6 +26,16 @@ export default function Topbar({ notifPerm, onNotifClick, pins = [] }) {
           <span className="live-dot" />
           LIVE
         </div>
+
+        {notifPerm === 'granted' && onSuppressToggle && (
+          <button
+            className={`suppress-btn ${suppressed ? 'suppressed' : ''}`}
+            onClick={onSuppressToggle}
+            title={suppressed ? 'Resume parking alerts' : 'Suppress parking alerts'}
+          >
+            {suppressed ? '▶ Resume Alerts' : '⏸ Done Parking?'}
+          </button>
+        )}
 
         <button
           className={`notif-btn ${notifClass}`}

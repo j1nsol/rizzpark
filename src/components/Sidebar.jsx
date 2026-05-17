@@ -1,29 +1,9 @@
 import { timeAgo } from '../utils/parking';
 import { clearSlotOverride } from '../utils/firebase';
 
-const FILTER_OPTIONS = [
-  { key: 'all',      label: 'All Slots',  cls: 'all' },
-  { key: 'vacant',   label: 'Vacant',     cls: 'vacant' },
-  { key: 'reserved', label: 'Reserved',   cls: 'reserved' },
-  { key: 'occupied', label: 'Occupied',   cls: 'occupied' },
-];
-
-/**
- * @param {{
- *   slots: object[],
- *   filter: string,
- *   selectedSlot: object|null,
- *   onFilterChange: (f: string) => void,
- *   onToggleStatus: (slot: object) => void,
- *   onDeselect: () => void,
- *   showSelectedBox: boolean,
- * }} props
- */
 export default function Sidebar({
   slots,
-  filter,
   selectedSlot,
-  onFilterChange,
   onToggleStatus,
   onDeselect,
   onClearOverride,
@@ -87,27 +67,6 @@ export default function Sidebar({
               <div className="occ-fill" style={{ width: `${occPct}%` }} />
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Filter legend */}
-      <div>
-        <div className="sidebar-section-title">Filter</div>
-        <div className="legend">
-          {FILTER_OPTIONS.map(({ key, label, cls }) => {
-            const count = key === 'all' ? total : key === 'vacant' ? vacant : key === 'reserved' ? reserved : occupied;
-            return (
-              <div
-                key={key}
-                className={`legend-item${filter === key ? ' active' : ''}`}
-                onClick={() => onFilterChange(key)}
-              >
-                <div className={`legend-dot ${cls}`} />
-                {label}
-                <span className="legend-count">{count}</span>
-              </div>
-            );
-          })}
         </div>
       </div>
 

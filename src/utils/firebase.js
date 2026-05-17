@@ -127,6 +127,17 @@ export async function saveTokenSubscribedPins(token, subscribedPins) {
   }
 }
 
+// Saves the notification suppression flag onto the FCM token record
+// so Cloud Functions skip push delivery when the user is done parking.
+export async function saveNotificationSuppressed(token, suppressed) {
+  if (!token) return;
+  try {
+    await update(ref(db, `fcm_tokens/${token}`), { suppressed });
+  } catch (error) {
+    console.error('Failed to save suppression to Firebase:', error);
+  }
+}
+
 // ── Map Pin Helpers ───────────────────────────────────────────────────────────
 
 export async function saveMapPin(pinCode, name, lat, lng) {

@@ -67,6 +67,7 @@ const NOTIF_DEFAULTS = {
   soundEnabled: true,
   vibrationEnabled: true,
   subscribedPins: ['all'],
+  suppressed: false,
 };
 
 // Get user notification settings from localStorage
@@ -100,6 +101,7 @@ export function isPinSubscribed(pinCode) {
 export function shouldShowNotification(pinCode = null) {
   const s = getNotificationSettings();
   if (!s.enabled || !s.slotAvailable) return false;
+  if (s.suppressed === true) return false;
   if (isQuietHours()) return false;
   if (pinCode !== null && !isPinSubscribed(pinCode)) return false;
   return true;
@@ -125,6 +127,7 @@ export function fireFullNotif(pinName, pinCode = null) {
   if (!isGranted()) return;
   const s = getNotificationSettings();
   if (!s.enabled || !s.parkingFull) return;
+  if (s.suppressed === true) return;
   if (isQuietHours()) return;
   if (pinCode !== null && !isPinSubscribed(pinCode)) return;
   new Notification('Rizz Park — Parking Full!', {

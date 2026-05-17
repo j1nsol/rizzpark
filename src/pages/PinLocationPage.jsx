@@ -5,11 +5,12 @@ import Topbar        from '../components/Topbar';
 import Sidebar       from '../components/Sidebar';
 import ParkingCardGrid from '../components/ParkingCardGrid';
 import GoogleMapView from '../components/GoogleMapView';
+import DoneParkingBar from '../components/DoneParkingBar';
 import { usePinFirebaseSlots } from '../hooks/usePinFirebaseSlots';
 
-import { setPinSlotOverride, clearPinSlotOverride } from '../utils/firebase';
+import { setPinSlotOverride, clearPinSlotOverride, saveNotificationSuppressed } from '../utils/firebase';
 import { useFCM } from '../hooks/useFCM';
-import { canNotify, fireNotif, fireFullNotif, requestPerm } from '../utils/parking';
+import { canNotify, fireNotif, fireFullNotif, requestPerm, getNotificationSettings } from '../utils/parking';
 
 const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
 
@@ -19,12 +20,14 @@ export default function PinLocationPage() {
   const fcm = useFCM();
 
   const [selectedId,  setSelectedId]  = useState(null);
-  const [filter,      setFilter]      = useState('all');
   const [showMap,     setShowMap]     = useState(false);
   const [allPins,     setAllPins]     = useState([]);
   const [activePins,  setActivePins]  = useState(null);
   const [notifPerm,   setNotifPerm]   = useState(
     canNotify() ? Notification.permission : 'unavailable'
+  );
+  const [suppressed,  setSuppressed]  = useState(
+    () => getNotificationSettings().suppressed === true
   );
 
   const prevSlotsRef = useRef([]);
@@ -77,6 +80,14 @@ export default function PinLocationPage() {
     } catch {}
   }
 
+  async function handleSuppressToggle() {
+    const newVal = !suppressed;
+    setSuppressed(newVal);
+    const s = getNotificationSettings();
+    localStorage.setItem('rizzpark_notification_settings', JSON.stringify({ ...s, suppressed: newVal }));
+    await saveNotificationSuppressed(fcm.token, newVal);
+  }
+
   const total    = slots.length;
   const vacant   = slots.filter(s => s.status === 'vacant').length;
   const occupied = slots.filter(s => s.status === 'occupied').length;
@@ -103,15 +114,14 @@ export default function PinLocationPage() {
 
   return (
     <div className="app">
-      <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} pins={allPins} />
+      <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} pins={allPins}
+        suppressed={suppressed} onSuppressToggle={handleSuppressToggle} />
 
 
       <div className="main">
         <Sidebar
           slots={hasLiveData ? slots : []}
-          filter={filter}
           selectedSlot={selectedSlot}
-          onFilterChange={setFilter}
           onToggleStatus={handleToggleStatus}
           onClearOverride={(id) => clearPinSlotOverride(pinCode, id)}
           onDeselect={() => setSelectedId(null)}
@@ -135,7 +145,7 @@ export default function PinLocationPage() {
               slots={slots}
               selected={selectedId}
               onSelect={setSelectedId}
-              filter={filter}
+              filter="all"
               theme="driver"
               showCarIcon={true}
             />
@@ -159,6 +169,8 @@ export default function PinLocationPage() {
       {showMap && (
         <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} />
       )}
+
+      <DoneParkingBar suppressed={suppressed} onToggle={handleSuppressToggle} notifPerm={notifPerm} />
     </div>
   );
 }

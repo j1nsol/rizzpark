@@ -7,18 +7,17 @@ import GoogleMapView     from './components/GoogleMapView';
 import MapIntro          from './components/MapIntro';
 import ToastStack        from './components/ToastStack';
 import OnboardingOverlay from './components/OnboardingOverlay';
+import DoneParkingBar    from './components/DoneParkingBar';
 import {
   TweaksPanel, TweakSection, TweakToggle, TweakColor,
 } from './components/TweaksPanel';
 import { useTweaks }         from './hooks/useTweaks';
 import { useFirebaseSlots }  from './hooks/useFirebaseSlots';
 import { useFCM }            from './hooks/useFCM';
-import { useConsoleLog }     from './hooks/useConsoleLog';
-import ConsolePanel          from './components/ConsolePanel';
 import {
-  canNotify, isGranted, requestPerm, fireNotif, fireFullNotif, ONBOARDING_KEY,
+  canNotify, requestPerm, fireNotif, fireFullNotif, getNotificationSettings, ONBOARDING_KEY,
 } from './utils/parking';
-import { setSlotOverride } from './utils/firebase';
+import { setSlotOverride, saveNotificationSuppressed } from './utils/firebase';
 import { getFirebasePath } from './config/modeConfig';
 
 const TWEAK_DEFAULTS = {
@@ -30,12 +29,13 @@ export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const { slots, fbStatus, showSelectedBox } = useFirebaseSlots(getFirebasePath());
   const fcm = useFCM();
-  // const { logs, clear } = useConsoleLog();
 
   const [selectedId,     setSelectedId]     = useState(null);
-  const [filter,         setFilter]         = useState('all');
   const [notifPerm,      setNotifPerm]      = useState(
     canNotify() ? Notification.permission : 'unavailable'
+  );
+  const [suppressed,     setSuppressed]     = useState(
+    () => getNotificationSettings().suppressed === true
   );
   const [toasts,         setToasts]         = useState([]);
   const [showOnboarding, setShowOnboarding] = useState(
@@ -61,17 +61,10 @@ export default function App() {
     if (!fcm.token) return;
 
     const unsubscribe = fcm.onMessage((payload) => {
-      console.log('Received FCM message in foreground:', payload);
-      
-      // Extract slot data from message
       const slotData = payload.data || {};
       const slotId = slotData.slotId;
       const row = slotData.row;
-
-      // Show toast notification for foreground messages
-      if (slotId && row) {
-        spawnToast(slotId, row);
-      }
+      if (slotId && row) spawnToast(slotId, row);
     });
 
     return unsubscribe;
@@ -97,10 +90,10 @@ export default function App() {
       return;
     }
     const prevById = Object.fromEntries(prevSlotsRef.current.map(s => [s.id, s]));
-    const changedSlots = slots.filter(s => 
+    const changedSlots = slots.filter(s =>
       prevById[s.id]?.status === 'occupied' && s.status === 'vacant'
     );
-    
+
     changedSlots.forEach(s => {
       fireNotif(s);
       spawnToast(s.id, s.row);
@@ -123,7 +116,6 @@ export default function App() {
     '--accent-pale': tweaks.accentColor + '1A',
   };
 
-  // Status subtitle shown in the grid header
   const statusLine =
     fbStatus === 'online'   ? 'Live data · updates every ~3 s'  :
     fbStatus === 'checking' ? 'Connecting to live feed…'         :
@@ -153,7 +145,6 @@ export default function App() {
 
   async function handleNotif() {
     if (notifPerm === 'granted') return;
-
     try {
       if (fcm.isSupported) {
         await fcm.requestPermission();
@@ -169,6 +160,14 @@ export default function App() {
     }
   }
 
+  async function handleSuppressToggle() {
+    const newVal = !suppressed;
+    setSuppressed(newVal);
+    const s = getNotificationSettings();
+    localStorage.setItem('rizzpark_notification_settings', JSON.stringify({ ...s, suppressed: newVal }));
+    await saveNotificationSuppressed(fcm.token, newVal);
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -177,16 +176,20 @@ export default function App() {
         <OnboardingOverlay onDismiss={() => { setShowOnboarding(false); setShowMapIntro(true); }} />
       )}
 
-      <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} pins={allPins} />
+      <Topbar
+        notifPerm={notifPerm}
+        onNotifClick={handleNotif}
+        pins={allPins}
+        suppressed={suppressed}
+        onSuppressToggle={handleSuppressToggle}
+      />
 
       {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} activePins={activePins} />}
 
       <div className="main" style={showMapIntro ? { display: 'none' } : {}}>
         <Sidebar
           slots={slots}
-          filter={filter}
           selectedSlot={selectedSlot}
-          onFilterChange={setFilter}
           onToggleStatus={handleToggleStatus}
           onDeselect={() => setSelectedId(null)}
           showSelectedBox={showSelectedBox}
@@ -208,7 +211,7 @@ export default function App() {
             slots={slots}
             selected={selectedId}
             onSelect={setSelectedId}
-            filter={filter}
+            filter="all"
             theme="driver"
             showCarIcon={tweaks.showCarIcon}
           />
@@ -218,7 +221,12 @@ export default function App() {
       {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} />}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
-      {/* <ConsolePanel logs={logs} onClear={clear} /> */}
+
+      <DoneParkingBar
+        suppressed={suppressed}
+        onToggle={handleSuppressToggle}
+        notifPerm={notifPerm}
+      />
 
       <TweaksPanel>
         <TweakSection label="Display" />
