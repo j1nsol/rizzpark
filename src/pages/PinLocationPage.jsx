@@ -6,6 +6,7 @@ import Sidebar       from '../components/Sidebar';
 import ParkingCardGrid from '../components/ParkingCardGrid';
 import GoogleMapView from '../components/GoogleMapView';
 import { usePinFirebaseSlots } from '../hooks/usePinFirebaseSlots';
+
 import { setPinSlotOverride, clearPinSlotOverride } from '../utils/firebase';
 import { useFCM } from '../hooks/useFCM';
 import { canNotify, fireNotif, requestPerm } from '../utils/parking';
@@ -95,6 +96,7 @@ export default function PinLocationPage() {
   return (
     <div className="app">
       <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} />
+
 
       <div className="main">
         <Sidebar
