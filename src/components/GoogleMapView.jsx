@@ -3,27 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-const parkingIcon = L.icon({
-  iconUrl:     '/topbar-logo.png',
-  iconSize:    [40, 40],
-  iconAnchor:  [20, 40],
-  popupAnchor: [0, -44],
-});
-
-const unavailableIcon = L.divIcon({
-  html: '<img src="/topbar-logo.png" style="width:40px;height:40px;filter:grayscale(1);opacity:0.55;" />',
-  className: '',
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
-  popupAnchor: [0, -44],
-});
-
 const DEFAULT_CENTER = [10.294722999317614, 123.88045512649316];
-const MAP_ZOOM = 14 ;
+const MAP_ZOOM = 14;
 
-const PIN_ACTIVE_TTL = 45_000; // ms — pin is live if heartbeat is within this window
+const PIN_ACTIVE_TTL = 45_000;
 
-export default function GoogleMapView({ onClose, pins = [], activePins = null }) {
+function makeMarkerIcon(isAvailable, occ) {
+  let badgeHtml = '';
+  if (occ && occ.total > 0) {
+    const cls   = occ.vacant === 0 ? 'full' : 'vacant';
+    const label = occ.vacant === 0 ? 'Full' : `${occ.vacant} free`;
+    badgeHtml = `<div class="pin-occ-badge ${cls}">${label}</div>`;
+  }
+  const imgStyle = isAvailable
+    ? 'width:40px;height:40px'
+    : 'width:40px;height:40px;filter:grayscale(1);opacity:0.55';
+  return L.divIcon({
+    html: `<div class="pin-marker-wrap">${badgeHtml}<img src="/topbar-logo.png" style="${imgStyle}" /></div>`,
+    className: '',
+    iconSize:    [40, 60],
+    iconAnchor:  [20, 60],
+    popupAnchor: [0, -64],
+  });
+}
+
+export default function GoogleMapView({ onClose, pins = [], activePins = null, pinsOccupancy = {} }) {
   const navigate        = useNavigate();
   const mapRef          = useRef(null);
   const instanceRef     = useRef(null);
@@ -43,11 +47,11 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null })
       zoomControl: true,
     });
     instanceRef.current = map;
-  instanceRef.current.setView(DEFAULT_CENTER, MAP_ZOOM);
-   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-  maxZoom: 19,
-  }).addTo(map);
+    instanceRef.current.setView(DEFAULT_CENTER, MAP_ZOOM);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 19,
+    }).addTo(map);
 
     const stopDrag = () => map.fire('mouseup');
     document.addEventListener('mouseup', stopDrag);
@@ -64,43 +68,72 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null })
   useEffect(() => {
     if (!instanceRef.current) return;
 
-    // Clear and rebuild all markers so icon/popup reflects latest activePins
     fbMarkersRef.current.forEach(marker => marker.remove());
     fbMarkersRef.current.clear();
 
     pins.forEach(pin => {
       const ts = activePins?.[pin.pinCode];
       const isAvailable = ts != null && (Date.now() - ts) < PIN_ACTIVE_TTL;
-      const icon = isAvailable ? parkingIcon : unavailableIcon;
+      const occ  = pinsOccupancy?.[pin.pinCode];
+      const icon = makeMarkerIcon(isAvailable, occ);
 
       const wrap = document.createElement('div');
-      wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:150px';
+      wrap.style.cssText = 'display:flex;flex-direction:column;min-width:220px;font-family:"DM Sans",sans-serif;';
 
+      // ── Header: centered logo + name
+      const header = document.createElement('div');
+      header.style.cssText = 'padding:16px 16px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center';
       const title = document.createElement('div');
-      title.style.cssText = 'font-family:sans-serif;font-size:13px;font-weight:700';
+      title.style.cssText = 'font-size:14px;font-weight:700;color:#111;line-height:1.3';
       title.textContent = pin.name;
+      header.appendChild(title);
+      wrap.appendChild(header);
 
-      const code = document.createElement('div');
-      code.style.cssText = 'font-family:monospace;font-size:11px;color:#64748b';
-      code.textContent = `📍 ${pin.pinCode}`;
+      const divider = () => {
+        const d = document.createElement('div');
+        d.style.cssText = 'height:1px;background:#e4e1da;margin:0';
+        return d;
+      };
 
-      wrap.appendChild(title);
-      wrap.appendChild(code);
+      // ── Occupancy section
+      if (occ && occ.total > 0) {
+        wrap.appendChild(divider());
+        const occSection = document.createElement('div');
+        occSection.style.cssText = 'padding:10px 16px';
+        const pct   = Math.round((occ.vacant / occ.total) * 100);
+        const color = occ.vacant === 0 ? '#D93A3A' : occ.vacant <= 2 ? '#F97316' : '#22A06B';
+        const label = occ.vacant === 0 ? 'Full — no slots available'
+                    : occ.vacant === 1 ? '1 slot available'
+                    : `${occ.vacant} of ${occ.total} available`;
+        occSection.innerHTML =
+          `<div style="font-size:12px;font-weight:600;color:${color};margin-bottom:6px">${label}</div>` +
+          `<div style="height:4px;background:#e4e1da;border-radius:4px;overflow:hidden">` +
+            `<div style="height:100%;width:${pct}%;background:${color};border-radius:4px"></div>` +
+          `</div>`;
+        wrap.appendChild(occSection);
+      }
 
+      // ── No camera feed notice
       if (!isAvailable) {
+        wrap.appendChild(divider());
         const noFeed = document.createElement('div');
-        noFeed.style.cssText = 'font-family:sans-serif;font-size:11px;color:#94a3b8;margin-top:1px';
+        noFeed.style.cssText = 'padding:8px 16px;font-size:11px;color:#94a3b8';
         noFeed.textContent = '📷 No camera feed';
         wrap.appendChild(noFeed);
       }
 
+      // ── Action button
+      wrap.appendChild(divider());
       const navBtn = document.createElement('button');
       navBtn.textContent = 'View Parking →';
-      if (isAvailable) {
-        navBtn.style.cssText = 'margin-top:4px;padding:5px 12px;border-radius:6px;border:1px solid #10b98144;background:#10b98115;color:#10b981;font-family:monospace;font-size:11px;cursor:pointer;font-weight:700';
-      } else {
-        navBtn.style.cssText = 'margin-top:4px;padding:5px 12px;border-radius:6px;border:1px solid #94a3b844;background:#94a3b815;color:#94a3b8;font-family:monospace;font-size:11px;cursor:pointer;font-weight:700';
-      }
+      const btnColor = isAvailable ? '#22A06B' : '#94a3b8';
+      navBtn.style.cssText =
+        `display:block;width:100%;padding:11px 16px;border:none;` +
+        `background:${btnColor};color:#fff;` +
+        `font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;` +
+        `cursor:pointer;border-radius:0 0 8px 8px;letter-spacing:.01em;transition:opacity .15s`;
+      navBtn.onmouseover = () => { navBtn.style.opacity = '0.88'; };
+      navBtn.onmouseout  = () => { navBtn.style.opacity = '1'; };
       navBtn.onclick = () => navigate(`/${pin.pinCode}`);
       wrap.appendChild(navBtn);
 
@@ -110,7 +143,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null })
 
       fbMarkersRef.current.set(pin.pinCode, marker);
     });
-  }, [pins, activePins]);
+  }, [pins, activePins, pinsOccupancy]);
 
   async function handleSearch(e) {
     e.preventDefault();

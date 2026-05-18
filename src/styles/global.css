@@ -733,6 +733,20 @@ select.twk-field{padding-right:22px;
   .map-overlay { padding: 12px; }
 }
 
+/* ── Pin occupancy badge on map markers ── */
+.pin-marker-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.pin-occ-badge {
+  font-size: 10px; font-weight: 700; font-family: 'DM Sans', sans-serif;
+  padding: 2px 7px; border-radius: 10px;
+  color: #fff; white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  line-height: 1.4; pointer-events: none;
+}
+.pin-occ-badge.vacant { background: #22A06B; }
+.pin-occ-badge.full   { background: #D93A3A; }
+
 /* ── Notification suppressor — desktop topbar pill ── */
 .suppress-btn {
   padding: 5px 12px;

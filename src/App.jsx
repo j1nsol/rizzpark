@@ -45,6 +45,7 @@ export default function App() {
   const [showMapIntro,   setShowMapIntro]   = useState(false);
   const [allPins,        setAllPins]        = useState([]);
   const [activePins,     setActivePins]     = useState(null);
+  const [pinsOccupancy,  setPinsOccupancy]  = useState({});
 
   const toastId      = useRef(0);
   const prevSlotsRef = useRef([]);
@@ -70,12 +71,31 @@ export default function App() {
     return unsubscribe;
   }, [fcm.token, fcm.onMessage]);
 
-  // Load Firebase geo pins and active Pi pin for the map
+  // Load Firebase geo pins, active Pi pin, and per-pin occupancy for the map
   useEffect(() => {
     const base = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
     fetch(`${base}/map_pins.json`)
       .then(r => r.json())
-      .then(data => { if (data && typeof data === 'object') setAllPins(Object.values(data)); })
+      .then(data => {
+        if (data && typeof data === 'object') {
+          const pinList = Object.values(data);
+          setAllPins(pinList);
+          pinList.forEach(pin => {
+            fetch(`${base}/locations/${pin.pinCode}/slots.json`)
+              .then(r => r.json())
+              .then(slots => {
+                if (slots && typeof slots === 'object') {
+                  const arr = Object.values(slots);
+                  const vacant = arr.filter(s =>
+                    (s.status || s.manualStatus || '').toLowerCase() === 'vacant'
+                  ).length;
+                  setPinsOccupancy(prev => ({ ...prev, [pin.pinCode]: { vacant, total: arr.length } }));
+                }
+              })
+              .catch(() => {});
+          });
+        }
+      })
       .catch(() => {});
     fetch(`${base}/pi_config/active_pins.json`)
       .then(r => r.json())
@@ -184,7 +204,7 @@ export default function App() {
         onSuppressToggle={handleSuppressToggle}
       />
 
-      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} activePins={activePins} />}
+      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} activePins={activePins} pinsOccupancy={pinsOccupancy} />}
 
       <div className="main" style={showMapIntro ? { display: 'none' } : {}}>
         <Sidebar
@@ -217,7 +237,7 @@ export default function App() {
         </div>
       </div>
 
-      {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} />}
+      {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} pinsOccupancy={pinsOccupancy} />}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
