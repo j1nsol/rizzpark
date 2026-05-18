@@ -21,8 +21,9 @@ export default function PinLocationPage() {
 
   const [selectedId,  setSelectedId]  = useState(null);
   const [showMap,     setShowMap]     = useState(false);
-  const [allPins,     setAllPins]     = useState([]);
-  const [activePins,  setActivePins]  = useState(null);
+  const [allPins,       setAllPins]       = useState([]);
+  const [activePins,    setActivePins]    = useState(null);
+  const [pinsOccupancy, setPinsOccupancy] = useState({});
   const [notifPerm,   setNotifPerm]   = useState(
     canNotify() ? Notification.permission : 'unavailable'
   );
@@ -32,12 +33,29 @@ export default function PinLocationPage() {
 
   const prevSlotsRef = useRef([]);
 
-  // Load all Firebase pins and active Pi pins for the map
+  // Load all Firebase pins, active Pi pins, and per-pin occupancy for the map
   useEffect(() => {
     fetch(`${FIREBASE_URL}/map_pins.json`)
       .then(r => r.json())
       .then(data => {
-        if (data && typeof data === 'object') setAllPins(Object.values(data));
+        if (data && typeof data === 'object') {
+          const pinList = Object.values(data);
+          setAllPins(pinList);
+          pinList.forEach(pin => {
+            fetch(`${FIREBASE_URL}/locations/${pin.pinCode}/slots.json`)
+              .then(r => r.json())
+              .then(slots => {
+                if (slots && typeof slots === 'object') {
+                  const arr = Object.values(slots);
+                  const vacant = arr.filter(s =>
+                    (s.status || s.manualStatus || '').toLowerCase() === 'vacant'
+                  ).length;
+                  setPinsOccupancy(prev => ({ ...prev, [pin.pinCode]: { vacant, total: arr.length } }));
+                }
+              })
+              .catch(() => {});
+          });
+        }
       })
       .catch(() => {});
     fetch(`${FIREBASE_URL}/pi_config/active_pins.json`)
@@ -167,7 +185,7 @@ export default function PinLocationPage() {
       </div>
 
       {showMap && (
-        <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} />
+        <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} pinsOccupancy={pinsOccupancy} />
       )}
 
       <DoneParkingBar suppressed={suppressed} onToggle={handleSuppressToggle} notifPerm={notifPerm} />
