@@ -27,7 +27,7 @@ const TWEAK_DEFAULTS = {
 
 export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { slots, fbStatus, showSelectedBox } = useFirebaseSlots(getFirebasePath());
+  const { slots, fbStatus, showSelectedBox, movingCars } = useFirebaseSlots(getFirebasePath());
   const fcm = useFCM();
 
   const [selectedId,     setSelectedId]     = useState(null);
@@ -213,6 +213,7 @@ export default function App() {
             onSelect={setSelectedId}
             filter="all"
             showCarIcon={tweaks.showCarIcon}
+            movingCars={movingCars}
           />
         </div>
       </div>

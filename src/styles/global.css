@@ -1,7 +1,7 @@
-/* ── Reset ── */
+﻿/* â”€â”€ Reset â”€â”€ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Design tokens ── */
+/* â”€â”€ Design tokens â”€â”€ */
 :root {
   --accent:        #F5A623;
   --accent-pale:   #FFF8EC;
@@ -50,10 +50,10 @@ body::before {
 
 #root { position: relative; z-index: 1; }
 
-/* ── App shell ── */
+/* â”€â”€ App shell â”€â”€ */
 .app { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
 
-/* ── Topbar ── */
+/* â”€â”€ Topbar â”€â”€ */
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -103,7 +103,7 @@ body::before {
 .notif-btn.on { background: var(--accent-pale); border-color: var(--accent); color: var(--accent); }
 .notif-btn.denied { background: #FFF0F0; border-color: #FFAAAA; color: var(--occupied); }
 
-/* ── Main layout ── */
+/* â”€â”€ Main layout â”€â”€ */
 .main {
   display: grid;
   grid-template-columns: 260px 1fr;
@@ -111,7 +111,7 @@ body::before {
   height: 100%;
 }
 
-/* ── Sidebar ── */
+/* â”€â”€ Sidebar â”€â”€ */
 .sidebar {
   background: var(--surface); border-right: 1.5px solid var(--border);
   padding: 24px 20px; display: flex; flex-direction: column; gap: 24px;
@@ -171,7 +171,7 @@ body::before {
 .sd-btn.danger  { background: var(--occupied-bg); color: var(--occupied); border-color: var(--occupied-border); }
 .sd-btn.danger:hover { background: var(--occupied); color: #fff; }
 
-/* ── Grid area ── */
+/* â”€â”€ Grid area â”€â”€ */
 .grid-area {
   padding: 24px; overflow: auto;
   display: flex; flex-direction: column; gap: 20px;
@@ -193,7 +193,7 @@ body::before {
 .sim-btn:hover { border-color: var(--text); color: var(--text); }
 .sim-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
 
-/* ── Parking map ── */
+/* â”€â”€ Parking map â”€â”€ */
 .parking-map {
   background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--r); box-shadow: var(--shadow-sm);
@@ -256,7 +256,7 @@ body::before {
 }
 .slot-card.just-changed { animation: slotPulse .4s ease both; }
 
-/* ── Toasts ── */
+/* â”€â”€ Toasts â”€â”€ */
 .toast-stack { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; pointer-events: none; }
 .toast {
   background: var(--surface); border: 1.5px solid var(--border);
@@ -276,7 +276,7 @@ body::before {
 .toast-x { background: none; border: none; font-size: 16px; color: var(--text-3); cursor: pointer; align-self: flex-start; padding: 0; line-height: 1; flex-shrink: 0; font-family: 'DM Sans', sans-serif; }
 .toast-x:hover { color: var(--text); }
 
-/* ── Onboarding overlay ── */
+/* â”€â”€ Onboarding overlay â”€â”€ */
 .onboarding-overlay {
   position: fixed; inset: 0; z-index: 1000;
   display: flex; align-items: center; justify-content: center;
@@ -399,7 +399,7 @@ body::before {
   .ob-body { padding: 22px 24px 26px; }
 }
 
-/* ── Responsive ── */
+/* â”€â”€ Responsive â”€â”€ */
 @media (max-width: 720px) {
   .slot-row-label { width: 32px; font-size: 9px; }
   .main { grid-template-columns: 1fr; }
@@ -449,7 +449,7 @@ body::before {
   .slot-row-wrap { gap: 3px; }
 }
 
-/* ── TweaksPanel (inlined from tweaks-panel.jsx) ── */
+/* â”€â”€ TweaksPanel (inlined from tweaks-panel.jsx) â”€â”€ */
 .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
   max-height:calc(100vh - 32px);display:flex;flex-direction:column;
   background:rgba(250,249,247,.78);color:#29261b;
@@ -533,7 +533,7 @@ select.twk-field{padding-right:22px;
 .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
 .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
 
-/* ── Settings Button ── */
+/* â”€â”€ Settings Button â”€â”€ */
 .settings-btn {
   background: rgba(0, 0, 0, 0.06);
   border: 1.5px solid var(--border-2);
@@ -557,10 +557,10 @@ select.twk-field{padding-right:22px;
   transform: scale(0.95);
 }
 
-/* ── Import Notification Settings Styles ── */
+/* â”€â”€ Import Notification Settings Styles â”€â”€ */
 @import './NotificationSettings.css';
 
-/* ── Map Intro (post-onboarding) ── */
+/* â”€â”€ Map Intro (post-onboarding) â”€â”€ */
 .map-intro {
   position: relative;
   display: flex; flex-direction: column;
@@ -591,7 +591,7 @@ select.twk-field{padding-right:22px;
 }
 .map-intro-btn:hover { background: #e09510; border-color: #e09510; }
 
-/* ── Map View Button ── */
+/* â”€â”€ Map View Button â”€â”€ */
 .map-view-btn {
   display: flex; align-items: center; gap: 7px;
   height: 34px; padding: 0 14px; border-radius: var(--r-sm);
@@ -602,7 +602,7 @@ select.twk-field{padding-right:22px;
 }
 .map-view-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-/* ── Google Map Modal ── */
+/* â”€â”€ Google Map Modal â”€â”€ */
 .map-overlay {
   position: fixed; inset: 0; z-index: 200;
   background: rgba(0,0,0,.45);
@@ -733,7 +733,7 @@ select.twk-field{padding-right:22px;
   .map-overlay { padding: 12px; }
 }
 
-/* ── Notification suppressor — desktop topbar pill ── */
+/* â”€â”€ Notification suppressor â€” desktop topbar pill â”€â”€ */
 .suppress-btn {
   padding: 5px 12px;
   border: 1.5px solid var(--accent);
@@ -754,7 +754,7 @@ select.twk-field{padding-right:22px;
 }
 .suppress-btn.suppressed:hover { background: #e5e7eb; color: #374151; }
 
-/* ── Notification suppressor — mobile sticky bottom bar ── */
+/* â”€â”€ Notification suppressor â€” mobile sticky bottom bar â”€â”€ */
 .done-parking-bar {
   display: none;
   position: fixed;
@@ -780,4 +780,16 @@ select.twk-field{padding-right:22px;
 .done-parking-bar.suppressed .done-parking-btn {
   background: #e5e7eb;
   color: #374151;
+}
+
+/* ── Moving-car emoji (drive-lane live tracking) ── */
+.moving-car-emoji {
+  position: absolute;
+  font-size: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+  z-index: 10;
+  filter: drop-shadow(0 1px 4px rgba(0,0,0,.35));
+  transition: left 0.8s ease, top 0.8s ease;
 }

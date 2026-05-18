@@ -11,7 +11,8 @@
       "Bash(xargs grep *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Mitch Walter Coraza\\\\Documents\\\\GitHub\\\\rizzpark\" -Recurse -Directory | Select-Object -First 20 | ForEach-Object { $_.FullName })"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Mitch Walter Coraza\\\\Documents\\\\GitHub\\\\rizzpark\" -Recurse -Directory | Select-Object -First 20 | ForEach-Object { $_.FullName })",
+      "Read(//mnt/c/**)"
     ]
   }
 }

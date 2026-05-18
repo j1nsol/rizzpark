@@ -16,7 +16,7 @@ const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southea
 
 export default function PinLocationPage() {
   const { pinCode } = useParams();
-  const { slots, fbStatus, lastUpdated, pinName } = usePinFirebaseSlots(pinCode);
+  const { slots, fbStatus, lastUpdated, pinName, movingCars } = usePinFirebaseSlots(pinCode);
   const fcm = useFCM();
 
   const [selectedId,  setSelectedId]  = useState(null);
@@ -147,6 +147,7 @@ export default function PinLocationPage() {
               onSelect={setSelectedId}
               filter="all"
               showCarIcon={true}
+              movingCars={movingCars}
             />
           ) : (
             <div style={{

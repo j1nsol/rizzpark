@@ -12,6 +12,7 @@ export default function ParkingMapSpatial({
   onSelect    = () => {},
   showCarIcon = true,
   filter      = 'all',
+  movingCars  = {},
 }) {
   const wrapRef = useRef(null);
   const [containerW, setContainerW] = useState(700);
@@ -111,7 +112,7 @@ export default function ParkingMapSpatial({
       }
     }
 
-    return { mode: 'spatial', positioned: snapped, rowLabels, driveways, containerH, noCoords };
+    return { mode: 'spatial', positioned: snapped, rowLabels, driveways, containerH, noCoords, toLeft, toTop };
   }, [filtered, containerW]);
 
   // ── Fallback: no coord data → stable row-grid ──────────────────────────────
@@ -194,6 +195,19 @@ export default function ParkingMapSpatial({
               theme="driver"
               showCarIcon={showCarIcon}
             />
+          </div>
+        ))}
+
+        {Object.entries(movingCars).map(([key, { cx, cy }]) => (
+          <div
+            key={key}
+            className="moving-car-emoji"
+            style={{
+              left: layout.toLeft(cx),
+              top:  layout.toTop(cy),
+            }}
+          >
+            🚗
           </div>
         ))}
       </div>

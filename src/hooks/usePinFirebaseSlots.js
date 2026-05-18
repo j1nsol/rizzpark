@@ -11,6 +11,7 @@ export function usePinFirebaseSlots(pinCode) {
   const [fbStatus,    setFbStatus]    = useState('checking');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [pinName,     setPinName]     = useState(null);
+  const [movingCars,  setMovingCars]  = useState({});
   const layoutRef = useRef({});
 
   // Fetch geometry from locations/{pinCode}/layout every 10s
@@ -134,6 +135,22 @@ export function usePinFirebaseSlots(pinCode) {
     return () => { if (timerId) clearTimeout(timerId); };
   }, [pinCode]);
 
+  // Poll /{pinCode}/moving_cars.json every 3 s for drive-lane car positions.
+  useEffect(() => {
+    if (!pinCode) return;
+    const load = async () => {
+      try {
+        const r = await fetch(`${FIREBASE_URL}/locations/${pinCode}/moving_cars.json`);
+        if (!r.ok) return;
+        const data = await r.json();
+        setMovingCars(data && typeof data === 'object' ? data : {});
+      } catch { /* silent */ }
+    };
+    load();
+    const iv = setInterval(load, 3_000);
+    return () => clearInterval(iv);
+  }, [pinCode]);
+
   // Clear justChanged flags after animation
   useEffect(() => {
     if (!slots.some(s => s.justChanged)) return;
@@ -144,5 +161,5 @@ export function usePinFirebaseSlots(pinCode) {
     return () => clearTimeout(id);
   }, [slots]);
 
-  return { slots, fbStatus, lastUpdated, pinName };
+  return { slots, fbStatus, lastUpdated, pinName, movingCars };
 }

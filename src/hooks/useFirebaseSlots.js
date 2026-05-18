@@ -22,6 +22,7 @@ export function useFirebaseSlots(firebasePath) {
   const [fbStatus,           setFbStatus]           = useState('checking');
   const [lastUpdated,        setLastUpdated]        = useState(null);
   const [showSelectedBox,    setShowSelectedBox]    = useState(true);
+  const [movingCars,         setMovingCars]         = useState({});
   const layoutRef = useRef({});
 
   // Fetch slot_layout (coords, row assignments) every 10 s — non-critical,
@@ -62,6 +63,23 @@ export function useFirebaseSlots(firebasePath) {
     const iv = setInterval(loadSettings, 5_000);
     return () => clearInterval(iv);
   }, []);
+
+  // Poll /{path}/moving_cars.json every 3 s for drive-lane car positions.
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await fetch(`${FIREBASE_URL}/${path}/moving_cars.json`);
+        if (!r.ok) return;
+        const data = await r.json();
+        setMovingCars(data && typeof data === 'object' ? data : {});
+      } catch {
+        // intentionally silent — moving cars are supplementary
+      }
+    };
+    load();
+    const iv = setInterval(load, 3_000);
+    return () => clearInterval(iv);
+  }, [path]);
 
   // Poll /parking.json for occupancy with exponential back-off on failure.
   // Applies manual override: if isOverridden is true, manualStatus takes precedence
@@ -143,5 +161,5 @@ export function useFirebaseSlots(firebasePath) {
     return () => clearTimeout(id);
   }, [slots]);
 
-  return { slots, fbStatus, lastUpdated, showSelectedBox };
+  return { slots, fbStatus, lastUpdated, showSelectedBox, movingCars };
 }
