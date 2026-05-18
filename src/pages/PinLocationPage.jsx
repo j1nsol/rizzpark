@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import '../styles/global.css';
 import Topbar        from '../components/Topbar';
 import Sidebar       from '../components/Sidebar';
-import ParkingCardGrid from '../components/ParkingCardGrid';
+import ParkingMapSpatial from '../components/ParkingMapSpatial';
 import GoogleMapView from '../components/GoogleMapView';
 import DoneParkingBar from '../components/DoneParkingBar';
 import { usePinFirebaseSlots } from '../hooks/usePinFirebaseSlots';
@@ -141,12 +141,11 @@ export default function PinLocationPage() {
           </div>
 
           {hasLiveData ? (
-            <ParkingCardGrid
+            <ParkingMapSpatial
               slots={slots}
               selected={selectedId}
               onSelect={setSelectedId}
               filter="all"
-              theme="driver"
               showCarIcon={true}
             />
           ) : (

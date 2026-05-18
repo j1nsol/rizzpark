@@ -184,16 +184,10 @@ export function groupSlotsByYProximity(slots, gapThreshold) {
 // duplicate labels like "A", "A" that break React's key uniqueness requirement.
 export function groupSlots(slots, gapThreshold) {
   if (!slots.length) return [];
-
-  // If every slot has a row field, skip Y-proximity entirely — it's authoritative
-  if (slots.every(s => s.row)) {
-    return groupSlotsByRowField(slots);
-  }
-
-  // Some slots have coords but not all have row fields — use Y-proximity
-  if (slots.some(s => s.coords)) {
-    return groupSlotsByYProximity(slots, gapThreshold);
-  }
-
+  const withRow = slots.filter(s => s.row).length;
+  // Prefer row-field grouping whenever the majority of slots have it.
+  // Y-proximity is only a last resort when row data is entirely absent.
+  if (withRow >= slots.length / 2) return groupSlotsByRowField(slots);
+  if (slots.some(s => s.coords))   return groupSlotsByYProximity(slots, gapThreshold);
   return groupSlotsByRowField(slots);
 }

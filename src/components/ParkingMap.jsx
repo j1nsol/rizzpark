@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import SlotCard from './SlotCard';
-import { ROWS } from '../utils/parking';
+import { groupSlotsByRowField } from '../utils/slotModel';
 
 /**
  * @param {{
@@ -25,12 +25,7 @@ export default function ParkingMap({
   const displaySlots =
     filter === 'all' ? slots : slots.filter((s) => s.status === filter);
 
-  // Group by row
-  const rowMap = {};
-  displaySlots.forEach((s) => {
-    if (!rowMap[s.row]) rowMap[s.row] = [];
-    rowMap[s.row].push(s);
-  });
+  const rows = groupSlotsByRowField(displaySlots);
 
   return (
     <div className="grid-area">
@@ -65,24 +60,27 @@ export default function ParkingMap({
 
       {/* Map */}
       <div className="parking-map">
-        <div className="map-inner">
-          {ROWS.map((row, ri) => (
-            <Fragment key={row}>
+        <div className="map-inner" style={{ width: 'fit-content', margin: '0 auto' }}>
+          {rows.map(({ label, slots: rowSlots }, ri) => (
+            <Fragment key={label}>
               {ri > 0 && (
                 <div className="map-road">
                   <span className="road-label">Drive Lane {ri}</span>
                 </div>
               )}
-              <div className="slot-row-wrap">
-                {(rowMap[row] || []).map((slot) => (
-                  <SlotCard
-                    key={slot.id}
-                    slot={slot}
-                    isSelected={selectedSlot?.id === slot.id}
-                    showCarIcon={showCarIcon}
-                    onClick={() => onSlotClick(slot)}
-                  />
-                ))}
+              <div className="slot-row">
+                <span className="slot-row-label">Row {label}</span>
+                <div className="slot-row-wrap" style={{ justifyContent: 'flex-start' }}>
+                  {rowSlots.map((slot) => (
+                    <SlotCard
+                      key={slot.id}
+                      slot={slot}
+                      isSelected={selectedSlot?.id === slot.id}
+                      showCarIcon={showCarIcon}
+                      onClick={() => onSlotClick(slot)}
+                    />
+                  ))}
+                </div>
               </div>
             </Fragment>
           ))}

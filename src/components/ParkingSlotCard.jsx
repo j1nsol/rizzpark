@@ -45,7 +45,7 @@ export default function ParkingSlotCard({ slot, isSelected, onClick, theme = 'dr
         onClick={onClick}
         title={`Slot ${slot.id} — ${slot.status}`}
         style={{
-          width: 72, minHeight: 90, borderRadius: 12,
+          width: 58, minHeight: 100, borderRadius: 12,
           cursor: 'pointer', position: 'relative', flexShrink: 0,
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',

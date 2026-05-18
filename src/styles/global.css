@@ -218,9 +218,16 @@ body::before {
 
 .slot-row-wrap { display: flex; gap: 10px; padding: 8px 0; justify-content: center; }
 
+.slot-row { display: flex; align-items: center; gap: 10px; }
+.slot-row-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-3);
+  width: 42px; flex-shrink: 0; text-align: right; user-select: none;
+}
+
 /* Slot card */
 .slot-card {
-  width: 88px; height: 80px;
+  width: 60px; height: 100px;
   border-radius: 8px; border: 2px solid transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 5px; cursor: pointer;
@@ -394,6 +401,7 @@ body::before {
 
 /* ── Responsive ── */
 @media (max-width: 720px) {
+  .slot-row-label { width: 32px; font-size: 9px; }
   .main { grid-template-columns: 1fr; }
   .sidebar { border-right: none; border-bottom: 1.5px solid var(--border); padding: 16px; }
   .stat-grid {
@@ -404,7 +412,7 @@ body::before {
   .stat-box:nth-child(2) { order: 2; }
   .stat-box:nth-child(3) { order: 3; }
   .stat-box.accent { order: 4; }
-  .slot-card { width: 70px; height: 64px; }
+  .slot-card { width: 52px; height: 88px; }
   .topbar { padding: 10px 16px; }
   .grid-area { padding: 16px; }
   .notif-label, .brand-tag, .brand-divider { display: none; }
@@ -416,7 +424,7 @@ body::before {
 }
 
 @media (max-width: 480px) {
-  .slot-card { width: 54px; height: 50px; gap: 3px; }
+  .slot-card { width: 42px; height: 72px; gap: 3px; }
   .slot-card .slot-icon { width: 26px; height: 18px; }
   .slot-card .slot-status-dot { width: 6px; height: 6px; top: 5px; right: 5px; }
   .slot-label { font-size: 11px; }
@@ -425,7 +433,7 @@ body::before {
 }
 
 @media (max-width: 414px) {
-  .slot-card { width: 46px; height: 42px; gap: 2px; }
+  .slot-card { width: 36px; height: 60px; gap: 2px; }
   .slot-card .slot-icon { width: 22px; height: 15px; }
   .slot-card .slot-status-dot { width: 5px; height: 5px; top: 4px; right: 4px; }
   .slot-label { font-size: 10px; }
@@ -434,7 +442,7 @@ body::before {
 }
 
 @media (max-width: 370px) {
-  .slot-card { width: 40px; height: 36px; gap: 2px; }
+  .slot-card { width: 30px; height: 50px; gap: 2px; }
   .slot-card .slot-icon { width: 18px; height: 12px; }
   .slot-card .slot-status-dot { width: 4px; height: 4px; top: 3px; right: 3px; }
   .slot-label { font-size: 9px; }

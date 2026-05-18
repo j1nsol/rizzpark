@@ -129,14 +129,10 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null })
 
       if (!data.length) { setSearchErr('No results found.'); return; }
 
-      const { lat, lon, display_name } = data[0];
+      const { lat, lon } = data[0];
       const latlng = [parseFloat(lat), parseFloat(lon)];
 
-      if (searchMarkerRef.current) searchMarkerRef.current.remove();
-      searchMarkerRef.current = L.marker(latlng, { icon: parkingIcon })
-        .addTo(instanceRef.current)
-        .bindPopup(display_name)
-        .openPopup();
+      if (searchMarkerRef.current) { searchMarkerRef.current.remove(); searchMarkerRef.current = null; }
 
       instanceRef.current.flyTo(latlng, 16, { duration: 1.2 });
     } catch {

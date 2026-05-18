@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import './styles/global.css';
 import Topbar            from './components/Topbar';
 import Sidebar           from './components/Sidebar';
-import ParkingCardGrid   from './components/ParkingCardGrid';
+import ParkingMapSpatial from './components/ParkingMapSpatial';
 import GoogleMapView     from './components/GoogleMapView';
 import MapIntro          from './components/MapIntro';
 import ToastStack        from './components/ToastStack';
@@ -207,12 +207,11 @@ export default function App() {
             </button>
           </div>
 
-          <ParkingCardGrid
+          <ParkingMapSpatial
             slots={slots}
             selected={selectedId}
             onSelect={setSelectedId}
             filter="all"
-            theme="driver"
             showCarIcon={tweaks.showCarIcon}
           />
         </div>
