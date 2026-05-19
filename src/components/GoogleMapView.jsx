@@ -7,6 +7,16 @@ const DEFAULT_CENTER = [10.294722999317614, 123.88045512649316];
 const MAP_ZOOM = 14;
 const PIN_ACTIVE_TTL = 45_000;
 
+function metersBetween(a, b) {
+  const R = 6_371_000;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLon = (b.lng - a.lng) * Math.PI / 180;
+  const x = Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
 function fmtDist(m) {
   return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
 }
@@ -52,6 +62,8 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
   // Route ref
   const routeLayerRef        = useRef(null);
   const startNavigationRef   = useRef(null); // stable ref so popup onclicks stay fresh
+  const lastRoutePosRef      = useRef(null); // position where route was last fetched
+  const navLoadingRef        = useRef(false);
 
   // Search state
   const [query,       setQuery]       = useState('');
@@ -60,8 +72,11 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
   const [suggestions, setSuggestions] = useState([]);
   const [sugLoading,  setSugLoading]  = useState(false);
   const [activeIdx,   setActiveIdx]   = useState(-1);
-  const debounceRef   = useRef(null);
-  const searchWrapRef = useRef(null);
+  const debounceRef    = useRef(null);
+  const searchWrapRef  = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Location state
   const [userPos, setUserPos] = useState(null);
@@ -153,11 +168,12 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
   }, [userPos]);
 
   // ── Navigation helpers ───────────────────────────────────────────────────
-  const fetchRoute = useCallback(async (pin, pos) => {
-    if (!pos) return;
+  const fetchRoute = useCallback(async (pin, pos, silent = false) => {
+    if (!pos || navLoadingRef.current) return;
 
-    setNavLoading(true);
-    setNavErr(null);
+    navLoadingRef.current = true;
+    if (!silent) { setNavLoading(true); setNavErr(null); }
+    lastRoutePosRef.current = pos;
 
     try {
       const url =
@@ -176,15 +192,19 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
         steps:    leg.steps,
       });
 
-      if (routeLayerRef.current) routeLayerRef.current.remove();
-      routeLayerRef.current = L.geoJSON(data.routes[0].geometry, {
+      // Draw new layer first, then remove old one — no flicker
+      const newLayer = L.geoJSON(data.routes[0].geometry, {
         style: { color: '#4A90E2', weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' },
       }).addTo(instanceRef.current);
 
-      instanceRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [40, 40] });
+      if (routeLayerRef.current) routeLayerRef.current.remove();
+      routeLayerRef.current = newLayer;
+
+      if (!silent) instanceRef.current.fitBounds(newLayer.getBounds(), { padding: [40, 40] });
     } catch {
-      setNavErr('Could not get route. Check your connection.');
+      if (!silent) setNavErr('Could not get route. Check your connection.');
     } finally {
+      navLoadingRef.current = false;
       setNavLoading(false);
     }
   }, []);
@@ -210,10 +230,13 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
     if (routeLayerRef.current) { routeLayerRef.current.remove(); routeLayerRef.current = null; }
   }
 
-  // Refresh route as user moves (only when navigating)
+  // Refresh route as user moves — only when moved >30 m from last route start
   useEffect(() => {
-    if (!navTarget || !userPosRef.current || navLoading) return;
-    fetchRoute(navTarget, userPosRef.current);
+    const pos = userPosRef.current;
+    if (!navTarget || !pos) return;
+    const last = lastRoutePosRef.current;
+    if (last && metersBetween(last, pos) < 30) return;
+    fetchRoute(navTarget, pos, true); // silent=true keeps old line visible, no fitBounds
   }, [userPos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Parking pin markers ─────────────────────────────────────────────────
@@ -413,6 +436,18 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
     }
   }
 
+  // ── Mobile search toggle ────────────────────────────────────────────────
+  function openSearch() {
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  }
+  function closeSearch() {
+    setSearchOpen(false);
+    setQuery('');
+    setSuggestions([]);
+    setSearchErr(null);
+  }
+
   // ── Locate button ───────────────────────────────────────────────────────
   function handleLocate() {
     const pos = userPosRef.current;
@@ -438,18 +473,22 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       <div className="map-modal">
 
         <div className="map-modal-header">
-          <div className="map-modal-title">
-            <img src="/topbar-logo.png" alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} />
-            Live Map View
+
+          {/* Branding */}
+          <div className={`map-modal-title${searchOpen ? ' map-title-search-open' : ''}`}>
+            <img src="/topbar-logo.png" alt="" style={{ width: 30, height: 30, objectFit: 'contain' }} />
+            <span>Live parking map</span>
           </div>
 
-          <form className="map-search-form" onSubmit={handleSearch}>
+          {/* Search form — desktop always, mobile only when open */}
+          <form className={`map-search-form${!searchOpen ? ' map-search-collapsed' : ''}`} onSubmit={handleSearch}>
             <div className="map-search-wrap" ref={searchWrapRef}>
               <svg className="map-search-icon" width="13" height="13" viewBox="0 0 13 13" fill="none">
                 <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3"/>
                 <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
               </svg>
               <input
+                ref={searchInputRef}
                 className="map-search-input"
                 type="text"
                 placeholder="Search location…"
@@ -500,22 +539,38 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
             </button>
           </form>
 
-          <button
-            className="map-locate-btn"
-            onClick={handleLocate}
-            title={locErr ?? 'Go to my location'}
-          >
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-              <circle cx="7.5" cy="7.5" r="3" stroke="currentColor" strokeWidth="1.4"/>
-              <path d="M7.5 1v2M7.5 12v2M1 7.5h2M12 7.5h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-          </button>
+          {/* Action buttons — always pushed to the right */}
+          <div className="map-header-actions">
+            {/* Search toggle: mobile only, hidden when search is open */}
+            <button className="map-icon-btn map-search-toggle-btn" onClick={openSearch} title="Search location">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M11 11l2.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </button>
 
-          <button className="map-close-btn" onClick={onClose} title="Close map">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </button>
+            {/* Locate */}
+            <button className="map-icon-btn map-locate-btn" onClick={handleLocate} title={locErr ?? 'Go to my location'}>
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <circle cx="7.5" cy="7.5" r="3" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M7.5 1v2M7.5 12v2M1 7.5h2M12 7.5h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </button>
+
+            <div className="map-header-divider" />
+
+            {/* Close / close-search */}
+            <button
+              className="map-icon-btn map-close-btn"
+              onClick={searchOpen ? closeSearch : onClose}
+              title={searchOpen ? 'Close search' : 'Close map'}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+
         </div>
 
         <div ref={mapRef} className="map-container" />
