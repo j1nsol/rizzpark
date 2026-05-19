@@ -70,7 +70,8 @@ export default function ParkingMapSpatial({
       rowGroups[r].push(s);
     });
 
-    const MIN_X_GAP = cardW + 10;
+    const edgeGap  = containerW <= 480 ? 1 : 10;
+    const MIN_X_GAP = cardW + edgeGap;
     const maxLeft   = containerW - pad;
 
     const snapped   = [];
