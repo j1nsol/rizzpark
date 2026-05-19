@@ -54,9 +54,14 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
   const startNavigationRef   = useRef(null); // stable ref so popup onclicks stay fresh
 
   // Search state
-  const [query,     setQuery]     = useState('');
-  const [searching, setSearching] = useState(false);
-  const [searchErr, setSearchErr] = useState(null);
+  const [query,       setQuery]       = useState('');
+  const [searching,   setSearching]   = useState(false);
+  const [searchErr,   setSearchErr]   = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [sugLoading,  setSugLoading]  = useState(false);
+  const [activeIdx,   setActiveIdx]   = useState(-1);
+  const debounceRef   = useRef(null);
+  const searchWrapRef = useRef(null);
 
   // Location state
   const [userPos, setUserPos] = useState(null);
@@ -307,12 +312,85 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
     });
   }, [pins, activePins, pinsOccupancy]);
 
-  // ── Search ──────────────────────────────────────────────────────────────
+  // ── Search suggestions (debounced) ─────────────────────────────────────
+  function handleQueryChange(e) {
+    const val = e.target.value;
+    setQuery(val);
+    setSearchErr(null);
+    setActiveIdx(-1);
+
+    clearTimeout(debounceRef.current);
+
+    if (!val.trim()) { setSuggestions([]); return; }
+
+    // Show matching pinned locations immediately (local, no network needed)
+    const q = val.trim().toLowerCase();
+    const pinMatches = pins
+      .filter(p => p.name.toLowerCase().includes(q))
+      .map(p => ({ short: p.name, display: p.name, lat: p.lat, lon: p.lng, type: 'pin' }));
+
+    setSuggestions(pinMatches);
+    setSugLoading(true);
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res  = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val.trim())}&format=json&limit=5&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data = await res.json();
+        const placeSugs = data.map(r => ({
+          display: r.display_name,
+          short:   r.name || r.display_name.split(',')[0],
+          lat:     parseFloat(r.lat),
+          lon:     parseFloat(r.lon),
+          type:    'place',
+        }));
+        setSuggestions([...pinMatches, ...placeSugs]);
+      } catch {
+        setSuggestions(pinMatches);
+      } finally {
+        setSugLoading(false);
+      }
+    }, 350);
+  }
+
+  function pickSuggestion(sug) {
+    setQuery(sug.short);
+    setSuggestions([]);
+    setActiveIdx(-1);
+    setSearchErr(null);
+    instanceRef.current?.flyTo([sug.lat, sug.lon], 16, { duration: 1.2 });
+  }
+
+  function handleSearchKeyDown(e) {
+    if (!suggestions.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx(i => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx(i => Math.max(i - 1, -1));
+    } else if (e.key === 'Enter' && activeIdx >= 0) {
+      e.preventDefault();
+      pickSuggestion(suggestions[activeIdx]);
+    } else if (e.key === 'Escape') {
+      setSuggestions([]);
+      setActiveIdx(-1);
+    }
+  }
+
+  // ── Search (Go button / Enter with no active suggestion) ────────────────
   async function handleSearch(e) {
     e.preventDefault();
+    if (activeIdx >= 0 && suggestions[activeIdx]) {
+      pickSuggestion(suggestions[activeIdx]);
+      return;
+    }
     const q = query.trim();
     if (!q) return;
 
+    setSuggestions([]);
     setSearching(true);
     setSearchErr(null);
 
@@ -326,11 +404,8 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       if (!data.length) { setSearchErr('No results found.'); return; }
 
       const { lat, lon } = data[0];
-      const latlng = [parseFloat(lat), parseFloat(lon)];
-
       if (searchMarkerRef.current) { searchMarkerRef.current.remove(); searchMarkerRef.current = null; }
-
-      instanceRef.current.flyTo(latlng, 16, { duration: 1.2 });
+      instanceRef.current.flyTo([parseFloat(lat), parseFloat(lon)], 16, { duration: 1.2 });
     } catch {
       setSearchErr('Search failed. Check your connection.');
     } finally {
@@ -369,7 +444,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
           </div>
 
           <form className="map-search-form" onSubmit={handleSearch}>
-            <div className="map-search-wrap">
+            <div className="map-search-wrap" ref={searchWrapRef}>
               <svg className="map-search-icon" width="13" height="13" viewBox="0 0 13 13" fill="none">
                 <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3"/>
                 <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -379,10 +454,46 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
                 type="text"
                 placeholder="Search location…"
                 value={query}
-                onChange={e => { setQuery(e.target.value); setSearchErr(null); }}
+                onChange={handleQueryChange}
+                onKeyDown={handleSearchKeyDown}
+                onBlur={() => setTimeout(() => setSuggestions([]), 150)}
                 disabled={searching}
+                autoComplete="off"
               />
               {searchErr && <span className="map-search-err">{searchErr}</span>}
+
+              {(suggestions.length > 0 || sugLoading) && (
+                <ul className="map-suggestions">
+                  {sugLoading && !suggestions.length && (
+                    <li className="map-suggestion-loading">Searching…</li>
+                  )}
+                  {suggestions.map((sug, i) => (
+                    <li
+                      key={i}
+                      className={`map-suggestion-item${i === activeIdx ? ' active' : ''}`}
+                      onMouseDown={() => pickSuggestion(sug)}
+                    >
+                      {sug.type === 'pin' ? (
+                        <img src="/topbar-logo.png" alt="" style={{ width: 14, height: 14, objectFit: 'contain', flexShrink: 0, marginTop: 2 }} />
+                      ) : (
+                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+                          <circle cx="5.5" cy="5.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+                          <path d="M8 8l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                        </svg>
+                      )}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <div className="map-suggestion-main">{sug.short}</div>
+                          {sug.type === 'pin' && <span className="map-suggestion-pin-badge">Parking</span>}
+                        </div>
+                        {sug.type === 'place' && (
+                          <div className="map-suggestion-sub">{sug.display.split(',').slice(1, 3).join(',').trim()}</div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <button className="map-search-btn" type="submit" disabled={searching || !query.trim()}>
               {searching ? '…' : 'Go'}
