@@ -327,7 +327,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       if (routeLayerRef.current) routeLayerRef.current.remove();
       routeLayerRef.current = newLayer;
 
-      if (!silent) instanceRef.current.fitBounds(newLayer.getBounds(), { padding: [40, 40] });
+      if (!silent) instanceRef.current.flyTo([pos.lat, pos.lng], 16, { duration: 1.2 });
       setNavErr(null);
     } catch {
       if (!silent) setNavErr('Could not get route. Check your connection.');
@@ -366,8 +366,9 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
     const map = instanceRef.current;
     if (!navTarget || !pos || !map) return;
 
-    // 1. Keep user centred on map
-    map.panTo([pos.lat, pos.lng], { animate: true, duration: 0.6 });
+    // 1. Keep user centred — enforce minimum zoom so the map never stays zoomed out
+    const zoom = Math.max(map.getZoom(), 15);
+    map.setView([pos.lat, pos.lng], zoom, { animate: true, duration: 0.6 });
 
     // 2. Advance to next step when within 25 m of the upcoming maneuver point
     if (navRoute) {
