@@ -138,6 +138,17 @@ export async function saveNotificationSuppressed(token, suppressed) {
   }
 }
 
+// Saves one or more notification preference flags (enabled, slotAvailable, parkingFull)
+// onto the FCM token record so Cloud Functions respect per-user settings.
+export async function saveNotificationPrefs(token, prefs) {
+  if (!token) return;
+  try {
+    await update(ref(db, `fcm_tokens/${token}`), prefs);
+  } catch (error) {
+    console.error('Failed to save notification prefs to Firebase:', error);
+  }
+}
+
 // ── Map Pin Helpers ───────────────────────────────────────────────────────────
 
 export async function saveMapPin(pinCode, name, lat, lng) {

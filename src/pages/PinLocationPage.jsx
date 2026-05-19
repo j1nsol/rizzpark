@@ -8,7 +8,7 @@ import GoogleMapView from '../components/GoogleMapView';
 import DoneParkingBar from '../components/DoneParkingBar';
 import { usePinFirebaseSlots } from '../hooks/usePinFirebaseSlots';
 
-import { setPinSlotOverride, clearPinSlotOverride, saveNotificationSuppressed } from '../utils/firebase';
+import { saveNotificationSuppressed } from '../utils/firebase';
 import { useFCM } from '../hooks/useFCM';
 import { canNotify, fireNotif, fireFullNotif, requestPerm, getNotificationSettings } from '../utils/parking';
 
@@ -19,7 +19,6 @@ export default function PinLocationPage() {
   const { slots, fbStatus, lastUpdated, pinName, movingCars } = usePinFirebaseSlots(pinCode);
   const fcm = useFCM();
 
-  const [selectedId,  setSelectedId]  = useState(null);
   const [showMap,     setShowMap]     = useState(false);
   const [allPins,       setAllPins]       = useState([]);
   const [activePins,    setActivePins]    = useState(null);
@@ -119,17 +118,6 @@ export default function PinLocationPage() {
     !hasLiveData            ? 'Pi offline — no live data' :
     `${vacant} available · ${occupied} occupied · updated ${new Date(lastUpdated).toLocaleTimeString('en-PH', { hour12: false })}`;
 
-  const selectedSlot = selectedId ? slots.find(s => s.id === selectedId) ?? null : null;
-
-  async function handleToggleStatus(slot) {
-    const newStatus = slot.status === 'occupied' ? 'Vacant' : 'Occupied';
-    try {
-      await setPinSlotOverride(pinCode, slot.id, newStatus);
-    } catch (e) {
-      console.error('Failed to override slot status:', e);
-    }
-  }
-
   return (
     <div className="app">
       <Topbar notifPerm={notifPerm} onNotifClick={handleNotif} pins={allPins}
@@ -137,14 +125,7 @@ export default function PinLocationPage() {
 
 
       <div className="main">
-        <Sidebar
-          slots={hasLiveData ? slots : []}
-          selectedSlot={selectedSlot}
-          onToggleStatus={handleToggleStatus}
-          onClearOverride={(id) => clearPinSlotOverride(pinCode, id)}
-          onDeselect={() => setSelectedId(null)}
-          showSelectedBox={true}
-        />
+        <Sidebar slots={hasLiveData ? slots : []} suppressed={suppressed} onToggle={handleSuppressToggle} notifPerm={notifPerm} />
 
         <div className="grid-area">
           <div className="grid-topbar">
@@ -161,8 +142,6 @@ export default function PinLocationPage() {
           {hasLiveData ? (
             <ParkingMapSpatial
               slots={slots}
-              selected={selectedId}
-              onSelect={setSelectedId}
               filter="all"
               showCarIcon={true}
               movingCars={movingCars}
@@ -185,10 +164,10 @@ export default function PinLocationPage() {
       </div>
 
       {showMap && (
-        <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} pinsOccupancy={pinsOccupancy} />
+        <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} pinsOccupancy={pinsOccupancy} currentPinCode={pinCode} />
       )}
 
-      <DoneParkingBar suppressed={suppressed} onToggle={handleSuppressToggle} notifPerm={notifPerm} />
+      <DoneParkingBar suppressed={suppressed} onToggle={handleSuppressToggle} />
     </div>
   );
 }

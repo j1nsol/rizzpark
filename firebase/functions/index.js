@@ -15,13 +15,17 @@ function getStatus(slot) {
   return slot?.status?.toLowerCase() || slot?.manualStatus?.toLowerCase();
 }
 
-// Returns tokens that are unexpired, not suppressed, and subscribed to pinCode (or 'all').
-// Pass pinCode=null for the legacy /parking path (only 'all' subscribers).
-function filterValidTokens(tokens, pinCode) {
+// Returns tokens that are unexpired, enabled, not suppressed, subscribed to pinCode,
+// and have the specific notification type turned on.
+// notifType: 'slotAvailable' | 'parkingFull'
+function filterValidTokens(tokens, pinCode, notifType = 'slotAvailable') {
   return Object.keys(tokens).filter(token => {
     const data = tokens[token];
     if (Date.now() - (data.timestamp || 0) >= TOKEN_MAX_AGE) return false;
+    if (data.enabled === false) return false;
     if (data.suppressed === true) return false;
+    if (notifType === 'slotAvailable' && data.slotAvailable === false) return false;
+    if (notifType === 'parkingFull'   && data.parkingFull   === false) return false;
     const subs = data.subscribedPins;
     if (!subs || subs.includes('all')) return true;
     return pinCode ? subs.includes(pinCode) : false;
@@ -86,7 +90,8 @@ exports.onSlotChange = functions.database
 
     const tokensSnap = await db.ref('fcm_tokens').once('value');
     const tokens = tokensSnap.val() || {};
-    const validTokens = filterValidTokens(tokens, null);
+    const notifType = slotFreed ? 'slotAvailable' : 'parkingFull';
+    const validTokens = filterValidTokens(tokens, null, notifType);
     if (validTokens.length === 0) return null;
 
     if (slotFreed) {
@@ -153,7 +158,8 @@ exports.onPinSlotChange = functions.database
 
     const tokensSnap = await db.ref('fcm_tokens').once('value');
     const tokens = tokensSnap.val() || {};
-    const validTokens = filterValidTokens(tokens, pinCode);
+    const notifType = slotFreed ? 'slotAvailable' : 'parkingFull';
+    const validTokens = filterValidTokens(tokens, pinCode, notifType);
     if (validTokens.length === 0) return null;
 
     if (slotFreed) {

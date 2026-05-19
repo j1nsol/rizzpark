@@ -101,6 +101,8 @@ body::before {
 }
 .notif-btn:hover { border-color: var(--accent); color: var(--accent); }
 .notif-btn.on { background: var(--accent-pale); border-color: var(--accent); color: var(--accent); }
+.notif-btn.off { background: #f3f4f6; border-color: #d1d5db; color: #6b7280; }
+.notif-btn.off:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-pale); }
 .notif-btn.denied { background: #FFF0F0; border-color: #FFAAAA; color: var(--occupied); }
 
 /* â”€â”€ Main layout â”€â”€ */
@@ -230,17 +232,39 @@ body::before {
   width: 60px; height: 100px;
   border-radius: 8px; border: 2px solid transparent;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 5px; cursor: pointer;
-  transition: transform .15s, box-shadow .15s, background .3s, border-color .3s;
+  gap: 5px; cursor: default;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .3s;
   position: relative; flex-shrink: 0;
   user-select: none;
 }
-.slot-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); z-index: 2; }
-.slot-card.selected { transform: translateY(-3px) scale(1.04); box-shadow: 0 0 0 3px var(--accent), var(--shadow-md); z-index: 3; }
+.slot-card:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 6px 18px rgba(0,0,0,0.10); z-index: 2; }
+
+.slot-card::after {
+  content: attr(data-status);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20,20,20,0.82);
+  color: #fff;
+  font-size: 10px; font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  text-transform: capitalize;
+  letter-spacing: .03em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+.slot-card:hover::after { opacity: 1; }
 
 .slot-card.vacant   { background: var(--vacant-bg);   border-color: var(--vacant-border); }
 .slot-card.occupied { background: var(--occupied-bg); border-color: var(--occupied-border); }
 .slot-card.reserved { background: var(--reserved-bg); border-color: var(--reserved-border); }
+.slot-card.vacant:hover   { border-color: var(--vacant); }
+.slot-card.occupied:hover { border-color: var(--occupied); }
+.slot-card.reserved:hover { border-color: var(--reserved); }
 
 .slot-icon { width: 32px; height: 22px; }
 .slot-label { font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: .02em; }
@@ -256,7 +280,18 @@ body::before {
 }
 .slot-card.just-changed { animation: slotPulse .4s ease both; }
 
-/* â”€â”€ Toasts â”€â”€ */
+/* Landing */
+.landing {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 40px 20px; text-align: center;
+}
+.landing-logo { width: 56px; height: 56px; object-fit: contain; opacity: 0.85; }
+.landing-title { font-size: 22px; font-weight: 700; color: var(--text); }
+.landing-sub { font-size: 14px; color: var(--text-2); max-width: 240px; line-height: 1.5; }
+.landing-cta { margin-top: 8px; }
+
+/* Toasts */
 .toast-stack { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; pointer-events: none; }
 .toast {
   background: var(--surface); border: 1.5px solid var(--border);
@@ -418,7 +453,7 @@ body::before {
   .notif-label, .brand-tag, .brand-divider { display: none; }
   .notif-btn { padding: 8px; }
   .live-pill { padding: 5px 10px; }
-  .suppress-btn { display: none; }
+  .sidebar-done-btn { display: none; }
   .done-parking-bar { display: block; }
   .app { padding-bottom: 80px; }
 }
@@ -747,53 +782,60 @@ select.twk-field{padding-right:22px;
 .pin-occ-badge.vacant { background: #22A06B; }
 .pin-occ-badge.full   { background: #D93A3A; }
 
-/* ── Notification suppressor — desktop topbar pill ── */
-.suppress-btn {
-  padding: 5px 12px;
+/* ── Done Parking — sidebar bottom button (desktop only) ── */
+.sidebar-done-btn {
+  margin-top: auto;
+  width: 100%;
+  padding: 12px 16px;
   border: 1.5px solid var(--accent);
-  border-radius: 20px;
-  background: transparent;
+  border-radius: var(--r-sm);
+  background: var(--accent-pale);
   color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
   cursor: pointer;
-  transition: all .2s;
+  transition: all .18s;
   white-space: nowrap;
+  text-align: center;
 }
-.suppress-btn:hover { background: var(--accent); color: #fff; }
-.suppress-btn.suppressed {
+.sidebar-done-btn:hover { background: var(--accent); color: #fff; }
+.sidebar-done-btn.suppressed {
   background: #f3f4f6;
   border-color: #d1d5db;
   color: #6b7280;
 }
-.suppress-btn.suppressed:hover { background: #e5e7eb; color: #374151; }
+.sidebar-done-btn.suppressed:hover { background: #e5e7eb; color: #374151; }
 
 /* â”€â”€ Notification suppressor â€” mobile sticky bottom bar â”€â”€ */
 .done-parking-bar {
   display: none;
   position: fixed;
   bottom: 0; left: 0; right: 0;
-  padding: 12px 20px 20px;
-  background: linear-gradient(to top, rgba(255,255,255,0.97) 70%, transparent);
+  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background: linear-gradient(to top, rgba(255,255,255,1) 65%, rgba(255,255,255,0));
   z-index: 200;
+  pointer-events: none;
 }
 .done-parking-btn {
   width: 100%;
-  padding: 14px;
+  padding: 15px;
   border: none;
-  border-radius: 14px;
+  border-radius: 16px;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(0,0,0,.15);
-  transition: opacity .2s, transform .15s;
+  box-shadow: 0 4px 20px rgba(245,166,35,.45), 0 1px 4px rgba(0,0,0,.12);
+  transition: opacity .2s, transform .15s, box-shadow .15s;
+  pointer-events: all;
+  letter-spacing: 0.01em;
 }
-.done-parking-btn:active { transform: scale(0.98); }
+.done-parking-btn:hover { box-shadow: 0 6px 24px rgba(245,166,35,.55), 0 1px 6px rgba(0,0,0,.14); }
+.done-parking-btn:active { transform: scale(0.97); }
 .done-parking-bar.suppressed .done-parking-btn {
   background: #e5e7eb;
   color: #374151;
+  box-shadow: 0 2px 8px rgba(0,0,0,.10);
 }
 
 /* ── Moving-car emoji (drive-lane live tracking) ── */
