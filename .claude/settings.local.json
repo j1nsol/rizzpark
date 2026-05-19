@@ -16,7 +16,16 @@
       "Bash(Get-ChildItem -Path \"c:\\\\rizzpark\" -Force)",
       "Bash(Select-Object Name, FullName)",
       "Bash(npm run *)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\parking-desktop\" -Recurse -Directory | Select-Object -First 20 | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\parking-desktop\" | ForEach-Object { \"$\\($_.Name\\) $\\(if \\($_.PSIsContainer\\) { '[DIR]' } else { '[FILE]' }\\)\" })",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\parking-desktop\" -Hidden | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\rizzpark\" | ForEach-Object { \"$\\($_.Name\\) $\\(if \\($_.PSIsContainer\\) { '[DIR]' } else { '[FILE]' }\\)\" })",
+      "Bash(Get-ChildItem -Path \"C:\\\\rizzpark\" -Recurse -Filter \"*remap*\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\parking-desktop\" -Recurse -Force)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName)",
+      "Bash(powershell -Command \"\\(Get-Content 'c:\\\\rizzpark\\\\src\\\\utils\\\\firebase.js' | Measure-Object -Line\\).Lines\")"
     ]
   }
 }

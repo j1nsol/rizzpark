@@ -257,6 +257,7 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
   const [snapLoading, setSnapLoading] = useState(false);
   const [showGuides,  setShowGuides]  = useState(false);
   const [guideData,   setGuideData]   = useState(null);  // {guides:[...], tolerance_px:80}
+  const [guideMsg,    setGuideMsg]    = useState(null);
   const imgRef                        = useRef(null);
   const lastTime                      = useRef(Date.now());
   const piOffline                     = piStatus === "error";
@@ -291,9 +292,17 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
     try {
       const r = await fetch(`${PI_API_URL}/remap/guides`, { signal: AbortSignal.timeout(5000) });
       const d = await r.json();
+      if (!d.guides || d.guides.length === 0) {
+        setGuideMsg("No guides configured — run the Remap Wizard first.");
+        setTimeout(() => setGuideMsg(null), 4000);
+        return;
+      }
       setGuideData(d);
       setShowGuides(true);
-    } catch {}
+    } catch {
+      setGuideMsg("Could not fetch guides — check Pi connection.");
+      setTimeout(() => setGuideMsg(null), 4000);
+    }
   };
 
   const videoCall = async (endpoint, body = null) => {
@@ -478,6 +487,13 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
           </button>
         </div>
       </div>
+
+      {guideMsg && (
+        <div style={{padding:"6px 12px",borderRadius:8,fontSize:10,fontFamily:C.mono,
+          background:"rgba(250,204,21,.12)",border:"1px solid rgba(250,204,21,.3)",color:"#facc15"}}>
+          ⚠ {guideMsg}
+        </div>
+      )}
 
       <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
         {[["#fbbf24","Vehicle (YOLO)"],["#f43f5e","Occupied"],["#f97316","Reserved"],["#10b981","Vacant"]].map(([c,l])=>(
@@ -1253,7 +1269,7 @@ function SlotEditorPanel({slots, piStatus, addLog, selectedPiCode, onSlotDeleted
       });
     } catch { /* Pi delete endpoint may not exist; continue to Firebase */ }
     try {
-      await deleteSlot(slotId);
+      await deleteSlot(selectedPiCode, slotId);
     } catch(e) {
       showMsg(`Delete failed: ${e.message}`, false);
       setConfirmDelete(null);

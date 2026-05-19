@@ -79,10 +79,10 @@ exports.onSlotChange = functions.database
     const beforeStatus = getStatus(before);
     const afterStatus  = getStatus(after);
 
-    const slotFreed    = beforeStatus === 'occupied' && afterStatus === 'vacant';
-    const slotOccupied = afterStatus === 'occupied';
+    const slotFreed        = beforeStatus === 'occupied' && afterStatus === 'vacant';
+    const slotBecameOccupied = afterStatus === 'occupied' && beforeStatus !== 'occupied';
 
-    if (!slotFreed && !slotOccupied) return null;
+    if (!slotFreed && !slotBecameOccupied) return null;
 
     const tokensSnap = await db.ref('fcm_tokens').once('value');
     const tokens = tokensSnap.val() || {};
@@ -113,7 +113,7 @@ exports.onSlotChange = functions.database
       });
 
     } else {
-      // slotOccupied — check if entire lot is now full
+      // slotBecameOccupied — check if entire lot is now full
       const allSlotsSnap = await db.ref('/parking/slots').once('value');
       const allSlots = Object.values(allSlotsSnap.val() || {});
       if (allSlots.length === 0 || !allSlots.every(s => getStatus(s) === 'occupied')) return null;
@@ -146,10 +146,10 @@ exports.onPinSlotChange = functions.database
     const beforeStatus = getStatus(before);
     const afterStatus  = getStatus(after);
 
-    const slotFreed    = beforeStatus === 'occupied' && afterStatus === 'vacant';
-    const slotOccupied = afterStatus === 'occupied';
+    const slotFreed          = beforeStatus === 'occupied' && afterStatus === 'vacant';
+    const slotBecameOccupied = afterStatus === 'occupied' && beforeStatus !== 'occupied';
 
-    if (!slotFreed && !slotOccupied) return null;
+    if (!slotFreed && !slotBecameOccupied) return null;
 
     const tokensSnap = await db.ref('fcm_tokens').once('value');
     const tokens = tokensSnap.val() || {};
@@ -174,7 +174,7 @@ exports.onPinSlotChange = functions.database
       console.log(`[${pinCode}] Slot ${slotId} freed: ${successCount} sent, ${failureCount} failed`);
 
     } else {
-      // slotOccupied — check if entire pin lot is now full
+      // slotBecameOccupied — check if entire pin lot is now full
       const allSlotsSnap = await db.ref(`/locations/${pinCode}/slots`).once('value');
       const allSlots = Object.values(allSlotsSnap.val() || {});
       if (allSlots.length === 0 || !allSlots.every(s => getStatus(s) === 'occupied')) return null;
