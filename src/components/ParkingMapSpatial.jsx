@@ -29,6 +29,10 @@ export default function ParkingMapSpatial({
   const filtered = filter === 'all' ? slots : slots.filter(s => s.status === filter);
 
   const layout = useMemo(() => {
+    const cardW = containerW <= 370 ? 18 : containerW <= 480 ? 22 : 60;
+    const cardH = containerW <= 370 ? 30 : containerW <= 480 ? 36 : 100;
+    const pad   = containerW <= 480 ? 16 : 64;
+
     const withCoords = filtered.filter(s => s.coords?.length >= 3);
     const noCoords   = filtered.filter(s => !s.coords?.length);
 
@@ -48,12 +52,12 @@ export default function ParkingMapSpatial({
     const rangeX = maxX - minX || 1;
     const rangeY = maxY - minY || 1;
 
-    const innerW = Math.max(containerW - 2 * PAD - CARD_W, 100);
+    const innerW = Math.max(containerW - 2 * pad - cardW, 100);
     const aspect = Math.min(Math.max(rangeY / rangeX, 0.3), 2.0);
     const innerH = innerW * aspect;
 
-    const toLeft = cx => PAD + ((cx - minX) / rangeX) * innerW;
-    const toTop  = cy => PAD + ((cy - minY) / rangeY) * innerH;
+    const toLeft = cx => pad + ((cx - minX) / rangeX) * innerW;
+    const toTop  = cy => pad + ((cy - minY) / rangeY) * innerH;
 
     // 1. Initial screen positions from camera coords
     const rawPositioned = pts.map(s => ({ ...s, left: toLeft(s.cx), top: toTop(s.cy) }));
@@ -66,8 +70,8 @@ export default function ParkingMapSpatial({
       rowGroups[r].push(s);
     });
 
-    const MIN_X_GAP = CARD_W + 10;
-    const maxLeft   = containerW - PAD;
+    const MIN_X_GAP = cardW + 10;
+    const maxLeft   = containerW - pad;
 
     const snapped   = [];
     const rowLabels = [];
@@ -92,21 +96,22 @@ export default function ParkingMapSpatial({
         sorted.forEach(s => snapped.push({ ...s, top: avgTop }));
 
         const groupCenterX = sorted.reduce((sum, s) => sum + s.left, 0) / sorted.length;
-        rowLabels.push({ label, left: groupCenterX, top: avgTop - CARD_H * 0.7, centerY: avgTop });
+        rowLabels.push({ label, left: groupCenterX, top: avgTop - cardH * 0.7, centerY: avgTop });
       });
 
-    const containerH = Math.max(...snapped.map(s => s.top)) + CARD_H / 2 + PAD;
+    const containerH = Math.max(...snapped.map(s => s.top)) + cardH / 2 + pad;
 
-    const GAP_THRESHOLD = CARD_H * 0.8;
+    const GAP_THRESHOLD = cardH * 0.8;
 
     const driveways = [];
     const rowsByY = rowLabels.slice().sort((a, b) => a.centerY - b.centerY);
     for (let i = 0; i < rowsByY.length - 1; i++) {
-      const gap = rowsByY[i + 1].centerY - rowsByY[i].centerY - CARD_H;
+      const gap = rowsByY[i + 1].centerY - rowsByY[i].centerY - cardH;
       if (gap > GAP_THRESHOLD) {
+        const LANE_PAD = 18;
         driveways.push({
-          top:    rowsByY[i].centerY + CARD_H / 2,
-          height: gap,
+          top:    rowsByY[i].centerY + cardH / 2 + LANE_PAD,
+          height: gap - 2 * LANE_PAD,
           label:  `Drive Lane ${i + 1}`,
         });
       }
@@ -166,18 +171,6 @@ export default function ParkingMapSpatial({
             style={{ position: 'absolute', left: 0, right: 0, top, height, margin: 0 }}
           >
             <span className="road-label">{label}</span>
-          </div>
-        ))}
-
-        {layout.rowLabels.map(({ label, left, top }) => (
-          <div key={label} style={{
-            position: 'absolute', left, top,
-            transform: 'translateX(-50%)',
-            fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '.06em', color: 'var(--text-3)',
-            userSelect: 'none', whiteSpace: 'nowrap', pointerEvents: 'none',
-          }}>
-            Row {label}
           </div>
         ))}
 

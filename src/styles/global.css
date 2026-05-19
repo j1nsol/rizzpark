@@ -424,29 +424,29 @@ body::before {
 }
 
 @media (max-width: 480px) {
-  .slot-card { width: 42px; height: 72px; gap: 3px; }
-  .slot-card .slot-icon { width: 26px; height: 18px; }
-  .slot-card .slot-status-dot { width: 6px; height: 6px; top: 5px; right: 5px; }
-  .slot-label { font-size: 11px; }
-  .slot-row-wrap { gap: 5px; }
+  .slot-card { width: 22px; height: 36px; gap: 1px; }
+  .slot-card .slot-icon { width: 14px; height: 9px; }
+  .slot-card .slot-status-dot { width: 4px; height: 4px; top: 2px; right: 2px; }
+  .slot-label { font-size: 7px; }
+  .slot-row-wrap { gap: 2px; }
   .parking-map { padding: 16px; }
 }
 
 @media (max-width: 414px) {
-  .slot-card { width: 36px; height: 60px; gap: 2px; }
-  .slot-card .slot-icon { width: 22px; height: 15px; }
-  .slot-card .slot-status-dot { width: 5px; height: 5px; top: 4px; right: 4px; }
-  .slot-label { font-size: 10px; }
-  .slot-row-wrap { gap: 4px; }
+  .slot-card { width: 22px; height: 36px; gap: 1px; }
+  .slot-card .slot-icon { width: 14px; height: 9px; }
+  .slot-card .slot-status-dot { width: 4px; height: 4px; top: 2px; right: 2px; }
+  .slot-label { font-size: 7px; }
+  .slot-row-wrap { gap: 2px; }
   .grid-area { padding: 12px; }
 }
 
 @media (max-width: 370px) {
-  .slot-card { width: 30px; height: 50px; gap: 2px; }
-  .slot-card .slot-icon { width: 18px; height: 12px; }
-  .slot-card .slot-status-dot { width: 4px; height: 4px; top: 3px; right: 3px; }
-  .slot-label { font-size: 9px; }
-  .slot-row-wrap { gap: 3px; }
+  .slot-card { width: 18px; height: 30px; gap: 1px; }
+  .slot-card .slot-icon { width: 12px; height: 8px; }
+  .slot-card .slot-status-dot { width: 3px; height: 3px; top: 2px; right: 2px; }
+  .slot-label { font-size: 6px; }
+  .slot-row-wrap { gap: 2px; }
 }
 
 /* â”€â”€ TweaksPanel (inlined from tweaks-panel.jsx) â”€â”€ */
