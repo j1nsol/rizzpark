@@ -9,6 +9,7 @@
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, remove, update, set } from 'firebase/database';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAQdadrOY92XZKyEWHDkwglxT7taiGWJhE",
@@ -24,6 +25,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
 export const messaging = getMessaging(app);
+export const auth = getAuth(app);
+export { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 
 // Permanently removes a slot from Firebase at locations/{pinCode}/slots/{id}
 // and locations/{pinCode}/layout/{id}.

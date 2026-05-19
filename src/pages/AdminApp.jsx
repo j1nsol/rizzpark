@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { normalizeAdminSlotsObject } from "../utils/slotModel";
-import { deleteSlot, savePinSlotLayout } from "../utils/firebase";
+import { deleteSlot, savePinSlotLayout, auth, signOut } from "../utils/firebase";
 import AdminMapEditor from "../components/AdminMapEditor";
 import ParkingCardGrid from "../components/ParkingCardGrid";
 import { getApiUrl, getMode, setMode, getFirebaseParkingPath, getFirebasePath, setFirebasePath } from "../config/modeConfig";
@@ -2872,6 +2872,152 @@ function RemapWizard({ piStatus, addLog, onClose }) {
   );
 }
 
+// ── Analytics Panel ───────────────────────────────────────────────────────────
+function AnalyticsPanel({ pinCode, firebaseUrl }) {
+  const [events,   setEvents]   = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [lastLoad, setLastLoad] = useState(null);
+
+  const load = useCallback(async () => {
+    if (!pinCode) return;
+    setLoading(true);
+    try {
+      const r = await fetch(
+        `${firebaseUrl}/logs/${pinCode}.json?orderBy="timestamp_ms"&limitToLast=500`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      const data = await r.json();
+      if (data && typeof data === "object") {
+        setEvents(Object.values(data).sort((a, b) => b.timestamp_ms - a.timestamp_ms));
+      } else {
+        setEvents([]);
+      }
+      setLastLoad(new Date().toLocaleTimeString("en-PH", { hour12: false }));
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }, [pinCode, firebaseUrl]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (!pinCode) {
+    return (
+      <Card style={{ padding: 24 }}>
+        <div style={{ textAlign: "center", color: C.muted, fontFamily: C.mono, fontSize: 12 }}>
+          Select a Pi above to view analytics.
+        </div>
+      </Card>
+    );
+  }
+
+  // ── Derived metrics ──────────────────────────────────────────────────────────
+  const toOccupied = events.filter(e => e.new_state === "Occupied");
+  const toVacant   = events.filter(e => e.new_state === "Vacant");
+
+  // Hourly event counts (0–23)
+  const hourlyCounts = Array(24).fill(0);
+  events.forEach(e => {
+    if (e.timestamp_ms) {
+      const h = new Date(e.timestamp_ms).getHours();
+      hourlyCounts[h]++;
+    }
+  });
+  const maxHourly  = Math.max(...hourlyCounts, 1);
+  const peakHour   = hourlyCounts.indexOf(Math.max(...hourlyCounts));
+  const peakLabel  = `${peakHour.toString().padStart(2, "0")}:00–${(peakHour + 1).toString().padStart(2, "0")}:00`;
+
+  // Unique slots touched
+  const uniqueSlots = new Set(events.map(e => e.slot_id)).size;
+
+  // Average inference ms
+  const inferences  = events.filter(e => e.inference_ms > 0).map(e => e.inference_ms);
+  const avgInfer    = inferences.length ? Math.round(inferences.reduce((a, b) => a + b, 0) / inferences.length) : null;
+
+  const Pill = ({ label, value, color }) => (
+    <div style={{ flex: 1, minWidth: 100, padding: "14px 16px", background: `${color}12`,
+      border: `1px solid ${color}33`, borderRadius: 12, textAlign: "center" }}>
+      <div style={{ fontFamily: C.mono, fontSize: 22, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontFamily: C.mono, fontSize: 10, color: C.muted, marginTop: 4 }}>{label}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <Card style={{ padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+          <span style={{ fontFamily: C.sans, fontWeight: 700, fontSize: 15 }}>Analytics — {pinCode}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {lastLoad && <span style={{ fontFamily: C.mono, fontSize: 10, color: C.muted }}>Last loaded {lastLoad}</span>}
+            <button onClick={load} disabled={loading}
+              style={{ padding: "5px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
+                background: "rgba(0,0,0,.04)", color: C.text, fontFamily: C.mono, fontSize: 11,
+                cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
+              {loading ? "Loading…" : "🔄 Refresh"}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+          <Pill label="Total Events" value={events.length}     color={C.accent}/>
+          <Pill label="→ Occupied"   value={toOccupied.length} color={C.occ}/>
+          <Pill label="→ Vacant"     value={toVacant.length}   color={C.vac}/>
+          <Pill label="Slots Active" value={uniqueSlots}       color={C.purple}/>
+          {avgInfer !== null && <Pill label="Avg Infer ms" value={avgInfer} color="#64748b"/>}
+        </div>
+
+        <div style={{ fontFamily: C.sans, fontWeight: 700, fontSize: 13, marginBottom: 10, color: C.muted }}>
+          Hourly Event Distribution
+          {events.length > 0 && <span style={{ fontFamily: C.mono, fontWeight: 400, fontSize: 10, marginLeft: 8 }}>Peak: {peakLabel} ({hourlyCounts[peakHour]} events)</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80 }}>
+          {hourlyCounts.map((count, h) => (
+            <div key={h} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <div style={{
+                width: "100%", background: h === peakHour ? C.occ : C.accent,
+                height: `${Math.round((count / maxHourly) * 64) + (count > 0 ? 4 : 0)}px`,
+                borderRadius: "3px 3px 0 0", opacity: count === 0 ? 0.15 : 0.85,
+                transition: "height .3s",
+              }} title={`${h}:00 — ${count} events`}/>
+              {h % 4 === 0 && (
+                <span style={{ fontFamily: C.mono, fontSize: 8, color: C.muted }}>
+                  {h.toString().padStart(2, "0")}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card style={{ padding: 20 }}>
+        <div style={{ fontFamily: C.sans, fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Recent Events</div>
+        {events.length === 0 ? (
+          <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, textAlign: "center", padding: "20px 0" }}>
+            No events yet. Events appear as slots change occupancy state.
+          </div>
+        ) : (
+          <div style={{ maxHeight: 320, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+            {events.slice(0, 100).map((ev, i) => {
+              const ts = ev.timestamp_ms ? new Date(ev.timestamp_ms).toLocaleTimeString("en-PH", { hour12: false }) : "?";
+              const isOcc = ev.new_state === "Occupied";
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px",
+                  borderRadius: 8, background: "rgba(0,0,0,.02)", fontFamily: C.mono, fontSize: 11 }}>
+                  <span style={{ color: C.muted, minWidth: 55 }}>{ts}</span>
+                  <span style={{ fontWeight: 700, minWidth: 44 }}>{ev.slot_id}</span>
+                  <span style={{ color: C.muted, minWidth: 24 }}>{ev.old_state?.[0]}→</span>
+                  <span style={{ color: isOcc ? C.occ : C.vac, fontWeight: 700 }}>{ev.new_state}</span>
+                  {ev.inference_ms > 0 && (
+                    <span style={{ color: C.muted, marginLeft: "auto" }}>{ev.inference_ms} ms</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── Admin Panel ───────────────────────────────────────────────────────────────
 function AdminPanel({slots,logs,onRemove,onSlotDeleted,removedSlots,addLog,onImageAnalysis,piStatus,firebaseStatus,mode,section,setSection,videoSource,setVideoSource,videoPlayState,setVideoPlayState,videoProgress,setVideoProgress,piRegistry,selectedPiCode,onSelectPi}){
   const [selected,setSelected]   = useState(null);
@@ -2891,6 +3037,7 @@ function AdminPanel({slots,logs,onRemove,onSlotDeleted,removedSlots,addLog,onIma
     {id:"program",    label:"⚙️ Properties"},
     {id:"image",      label:"🖼️ Image Test"},
     {id:"logs",       label:"📡 AI Feed"},
+    {id:"analytics",  label:"📊 Analytics"},
     {id:"mapped",     label:"📍 Pins"},
   ];
 
@@ -3063,6 +3210,10 @@ function AdminPanel({slots,logs,onRemove,onSlotDeleted,removedSlots,addLog,onIma
           </div>
           <AITerminal logs={logs}/>
         </Card>
+      )}
+
+      {section==="analytics"&&(
+        <AnalyticsPanel pinCode={selectedPiCode} firebaseUrl={FIREBASE_URL}/>
       )}
 
       {section==="mapped"&&(
@@ -3552,6 +3703,14 @@ export default function AdminApp(){
             <span style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>
               {lastUpdated?`Updated ${fmtTs()}`:"No data yet"}
             </span>
+            <button
+              onClick={() => signOut(auth)}
+              title="Sign out"
+              style={{padding:"4px 10px",borderRadius:8,border:"1px solid rgba(217,58,58,.35)",
+                background:"rgba(217,58,58,.08)",color:C.occ,fontFamily:C.mono,fontSize:10,
+                fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+              Sign out
+            </button>
           </div>
         </div>
       </div>
