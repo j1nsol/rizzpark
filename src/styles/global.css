@@ -457,6 +457,7 @@ body::before {
   .done-parking-bar { display: block; }
   .app { padding-bottom: 80px; }
 }
+@media (min-width: 721px) { .done-parking-bar { display: none; } }
 
 @media (max-width: 480px) {
   .slot-card { width: 22px; height: 36px; gap: 1px; }
@@ -986,7 +987,6 @@ select.twk-field{padding-right:22px;
 
 /* â”€â”€ Notification suppressor â€” mobile sticky bottom bar â”€â”€ */
 .done-parking-bar {
-  display: none;
   position: fixed;
   bottom: 0; left: 0; right: 0;
   padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
