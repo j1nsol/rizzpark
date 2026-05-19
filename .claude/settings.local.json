@@ -26,7 +26,13 @@
       "Bash(Select-Object -First 50)",
       "Bash(Format-Table FullName)",
       "Bash(powershell -Command \"\\(Get-Content 'c:\\\\rizzpark\\\\src\\\\utils\\\\firebase.js' | Measure-Object -Line\\).Lines\")",
-      "Bash(Get-ChildItem -Path \".\" -Recurse -Include \"*.jsx\", \"*.js\", \"*.tsx\", \"*.ts\", \"*.html\")"
+      "Bash(Get-ChildItem -Path \".\" -Recurse -Include \"*.jsx\", \"*.js\", \"*.tsx\", \"*.ts\", \"*.html\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(p.dependencies['react-router-dom']\\)\")",
+      "Bash(git -C \"C:\\\\training\\\\yolo_training\" log --oneline -10)",
+      "Bash(git -C \"C:\\\\parking-desktop\" log --oneline -10)",
+      "Bash(git -C \"C:\\\\Users\\\\JX\\\\Documents\\\\GitHub\\\\parking\" log --oneline -10)",
+      "Bash(git -C \"c:\\\\rizzpark\" remote -v)",
+      "Bash(grep -E \"\\\\.py$|\\\\.json$\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\JX\\Documents\\GitHub\\parking"

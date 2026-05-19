@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { normalizeAdminSlotsObject } from "../utils/slotModel";
 import { deleteSlot, savePinSlotLayout, auth, signOut } from "../utils/firebase";
 import AdminMapEditor from "../components/AdminMapEditor";
@@ -3416,6 +3417,7 @@ function UserView({slots,firebaseStatus}){
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 export default function AdminApp(){
+  const navigate = useNavigate();
   const [slots,setSlots]             = useState({});
   const [tab,setTab]                 = useState("user");
   const [logs,setLogs]               = useState([]);
@@ -3704,7 +3706,7 @@ export default function AdminApp(){
               {lastUpdated?`Updated ${fmtTs()}`:"No data yet"}
             </span>
             <button
-              onClick={() => signOut(auth)}
+              onClick={() => signOut(auth).then(() => navigate('/admin/login', { replace: true }))}
               title="Sign out"
               style={{padding:"4px 10px",borderRadius:8,border:"1px solid rgba(217,58,58,.35)",
                 background:"rgba(217,58,58,.08)",color:C.occ,fontFamily:C.mono,fontSize:10,

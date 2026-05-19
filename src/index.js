@@ -5,6 +5,8 @@ import './index.css';
 import App from './App';
 import AdminApp from './pages/AdminApp';
 import PinLocationPage from './pages/PinLocationPage';
+import LoginPage from './pages/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
 import reportWebVitals from './reportWebVitals';
 
 
@@ -14,7 +16,8 @@ root.render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
-        <Route path="/admin" element={<AdminApp />} />
+        <Route path="/admin/login" element={<LoginPage />} />
+        <Route path="/admin" element={<ProtectedRoute><AdminApp /></ProtectedRoute>} />
         <Route path="/:pinCode" element={<PinLocationPage />} />
       </Routes>
     </BrowserRouter>
