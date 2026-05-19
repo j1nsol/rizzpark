@@ -25,7 +25,11 @@
       "Bash(Get-ChildItem -Path \"C:\\\\parking-desktop\" -Recurse -Force)",
       "Bash(Select-Object -First 50)",
       "Bash(Format-Table FullName)",
-      "Bash(powershell -Command \"\\(Get-Content 'c:\\\\rizzpark\\\\src\\\\utils\\\\firebase.js' | Measure-Object -Line\\).Lines\")"
+      "Bash(powershell -Command \"\\(Get-Content 'c:\\\\rizzpark\\\\src\\\\utils\\\\firebase.js' | Measure-Object -Line\\).Lines\")",
+      "Bash(Get-ChildItem -Path \".\" -Recurse -Include \"*.jsx\", \"*.js\", \"*.tsx\", \"*.ts\", \"*.html\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\JX\\Documents\\GitHub\\parking"
     ]
   }
 }

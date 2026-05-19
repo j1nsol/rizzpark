@@ -251,8 +251,10 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
   const [error,       setError]       = useState(false);
   const [fps,         setFps]         = useState(0);
   const [videoFile,   setVideoFile]   = useState(null);
-  const [vidLoading,  setVidLoading]  = useState(false);
-  const [vidError,    setVidError]    = useState(null);
+  const [vidLoading,    setVidLoading]    = useState(false);
+  const [vidError,      setVidError]      = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(null); // 0-100 while uploading, null otherwise
+  const [seekInput,     setSeekInput]     = useState("");
   const [snapshot,    setSnapshot]    = useState(null);
   const [snapLoading, setSnapLoading] = useState(false);
   const [showGuides,  setShowGuides]  = useState(false);
@@ -305,6 +307,14 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
     }
   };
 
+  const framesToTime = (f, fps) => {
+    const secs = Math.floor(f / Math.max(fps, 1));
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+    return h > 0
+      ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+      : `${m}:${String(s).padStart(2,'0')}`;
+  };
+
   const videoCall = async (endpoint, body = null) => {
     const r = await fetch(`${PI_API_URL}${endpoint}`, { method: "POST", ...(body ? { body } : {}) });
     if (!r.ok) {
@@ -314,21 +324,43 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
     return r.json().catch(() => null);
   };
 
-  const handleVideoLoad = async () => {
+  const handleVideoLoad = () => {
     if (!videoFile) return;
     setVidLoading(true);
     setVidError(null);
+    setUploadProgress(0);
     const fd = new FormData();
     fd.append("video", videoFile);
-    try {
-      await videoCall("/video/load", fd);
-      setPlayState("stopped");
-      setProgress(null);
-    } catch (e) {
-      setVidError(e.message);
-    } finally {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setUploadProgress(Math.round(e.loaded / e.total * 100));
+    };
+    xhr.onload = () => {
       setVidLoading(false);
-    }
+      setUploadProgress(null);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        setPlayState("stopped");
+        setProgress(null);
+      } else {
+        try { setVidError(JSON.parse(xhr.responseText).error || `HTTP ${xhr.status}`); }
+        catch { setVidError(`HTTP ${xhr.status}`); }
+      }
+    };
+    xhr.onerror = () => { setVidLoading(false); setUploadProgress(null); setVidError("Upload failed"); };
+    xhr.open("POST", `${PI_API_URL}/video/load`);
+    xhr.send(fd);
+  };
+
+  const handleSeek = async (frame) => {
+    try {
+      await fetch(`${PI_API_URL}/video/seek`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ frame }),
+      });
+      setPlayState("paused");
+      setProgress(p => p ? { ...p, frame } : p);
+    } catch { /* silent */ }
   };
 
   const onFrameLoad = () => {
@@ -394,6 +426,16 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
               ⚠ {vidError}
             </div>
           )}
+          {/* Upload progress */}
+          {uploadProgress !== null && (
+            <div style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>
+              <div style={{marginBottom:3}}>Uploading… {uploadProgress}%</div>
+              <div style={{height:3,borderRadius:2,background:"rgba(0,0,0,.06)"}}>
+                <div style={{height:"100%",borderRadius:2,background:C.accent,
+                  width:`${uploadProgress}%`,transition:"width .3s"}}/>
+              </div>
+            </div>
+          )}
           {/* Controls */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             <button onClick={handleVideoLoad} disabled={!videoFile||piOffline||vidLoading}
@@ -427,15 +469,40 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
               ⏹ Stop
             </button>
           </div>
-          {/* Progress bar */}
+          {/* Playback progress + seek */}
           {progress && progress.total > 0 && (
             <div style={{fontFamily:C.mono,fontSize:10,color:C.muted}}>
-              <div style={{marginBottom:4}}>
-                Frame {progress.frame} / {progress.total} · {Math.round(progress.frame/progress.total*100)}% · {progress.fps} FPS
+              <div style={{marginBottom:4,display:"flex",justifyContent:"space-between"}}>
+                <span>{framesToTime(progress.frame, progress.fps)} / {framesToTime(progress.total, progress.fps)}</span>
+                <span>{Math.round(progress.frame/progress.total*100)}% · {progress.fps} FPS</span>
               </div>
-              <div style={{height:3,borderRadius:2,background:"rgba(0,0,0,.06)"}}>
-                <div style={{height:"100%",borderRadius:2,background:C.vac,
-                  width:`${Math.round(progress.frame/progress.total*100)}%`,transition:"width .5s"}}/>
+              <div onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const frame = Math.round((e.clientX - rect.left) / rect.width * progress.total);
+                  handleSeek(frame);
+                }}
+                style={{height:6,borderRadius:3,background:"rgba(0,0,0,.08)",cursor:"pointer",marginBottom:8}}>
+                <div style={{height:"100%",borderRadius:3,background:C.vac,
+                  width:`${Math.round(progress.frame/progress.total*100)}%`,
+                  transition:"width .5s",pointerEvents:"none"}}/>
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <input value={seekInput} onChange={e=>setSeekInput(e.target.value)}
+                  placeholder="m:ss or h:mm:ss"
+                  style={{flex:1,padding:"4px 8px",borderRadius:6,border:`1px solid rgba(0,0,0,.12)`,
+                    fontFamily:C.mono,fontSize:10,background:"transparent",color:C.text,outline:"none"}}/>
+                <button onClick={() => {
+                    const parts = seekInput.trim().split(":").map(Number);
+                    let secs = 0;
+                    if (parts.length === 2) secs = parts[0]*60 + parts[1];
+                    else if (parts.length === 3) secs = parts[0]*3600 + parts[1]*60 + parts[2];
+                    if (!isNaN(secs)) handleSeek(Math.round(secs * progress.fps));
+                  }}
+                  style={{padding:"4px 10px",borderRadius:6,
+                    border:`1px solid ${C.accent}55`,background:`${C.accent}15`,color:C.accent,
+                    fontFamily:C.mono,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                  Go
+                </button>
               </div>
             </div>
           )}
