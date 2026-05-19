@@ -68,10 +68,9 @@ export default function ParkingMapSpatial({
       rowGroups[r].push(s);
     });
 
-    const edgeGap    = containerW <= 480 ? 1 : 10;
-    const MIN_GAP    = cardW + edgeGap;
-    const SIDE_BY_SIDE = cardW * 3.0;
-    const maxLeft    = containerW - pad;
+    const edgeGap = containerW <= 480 ? 1 : 10;
+    const MIN_GAP = cardW + edgeGap;
+    const maxLeft = containerW - pad;
 
     const snapped   = [];
     const rowLabels = [];
@@ -83,9 +82,14 @@ export default function ParkingMapSpatial({
 
         const sorted = [...group].sort((a, b) => a.left - b.left);
 
+        const naturalDists = sorted.slice(1).map((s, i) => s.left - sorted[i].left);
+        const sortedD = [...naturalDists].sort((a, b) => a - b);
+        const median  = sortedD.length ? sortedD[Math.floor(sortedD.length / 2)] : 0;
+        const SIDE_BY_SIDE = median * 2.5;
+
         const positions = [sorted[0].left];
         for (let i = 1; i < sorted.length; i++) {
-          const naturalDist = sorted[i].left - sorted[i - 1].left;
+          const naturalDist = naturalDists[i - 1];
           const dist = naturalDist < SIDE_BY_SIDE
             ? MIN_GAP
             : Math.max(naturalDist, MIN_GAP);
