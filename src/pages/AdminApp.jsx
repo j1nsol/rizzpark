@@ -253,6 +253,10 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
   const [videoFile,   setVideoFile]   = useState(null);
   const [vidLoading,  setVidLoading]  = useState(false);
   const [vidError,    setVidError]    = useState(null);
+  const [snapshot,    setSnapshot]    = useState(null);
+  const [snapLoading, setSnapLoading] = useState(false);
+  const [showGuides,  setShowGuides]  = useState(false);
+  const [guideData,   setGuideData]   = useState(null);  // {guides:[...], tolerance_px:80}
   const imgRef                        = useRef(null);
   const lastTime                      = useRef(Date.now());
   const piOffline                     = piStatus === "error";
@@ -271,6 +275,26 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
     }, 2000);
     return () => clearInterval(iv);
   }, [playState]);
+
+  const handleSnapshot = async () => {
+    setSnapLoading(true);
+    try {
+      const r    = await fetch(`${PI_API_URL}/debug-frame`);
+      const blob = await r.blob();
+      setSnapshot(URL.createObjectURL(blob));
+    } catch { /* silent */ }
+    finally { setSnapLoading(false); }
+  };
+
+  const toggleGuides = async () => {
+    if (showGuides) { setShowGuides(false); return; }
+    try {
+      const r = await fetch(`${PI_API_URL}/remap/guides`, { signal: AbortSignal.timeout(5000) });
+      const d = await r.json();
+      setGuideData(d);
+      setShowGuides(true);
+    } catch {}
+  };
 
   const videoCall = async (endpoint, body = null) => {
     const r = await fetch(`${PI_API_URL}${endpoint}`, { method: "POST", ...(body ? { body } : {}) });
@@ -435,6 +459,23 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
               cursor:piOffline?"not-allowed":"pointer"}}>
             {active ? "⏸ Pause" : "▶ Resume"}
           </button>
+          <button onClick={handleSnapshot} disabled={piOffline||snapLoading}
+            style={{padding:"6px 14px",borderRadius:8,
+              border:`1px solid rgba(124,58,237,.35)`,
+              background:"rgba(124,58,237,.08)",color:"#7c3aed",
+              fontFamily:C.mono,fontSize:11,fontWeight:700,
+              cursor:(piOffline||snapLoading)?"not-allowed":"pointer"}}>
+            {snapLoading ? "…" : "Snapshot"}
+          </button>
+          <button onClick={toggleGuides} disabled={piOffline}
+            style={{padding:"6px 14px",borderRadius:8,
+              border:`1px solid ${showGuides?"rgba(250,204,21,.5)":"rgba(250,204,21,.2)"}`,
+              background:showGuides?"rgba(250,204,21,.18)":"rgba(250,204,21,.06)",
+              color:showGuides?"#facc15":"rgba(250,204,21,.6)",
+              fontFamily:C.mono,fontSize:11,fontWeight:700,
+              cursor:piOffline?"not-allowed":"pointer",transition:"all .15s"}}>
+            {showGuides ? "⊟ Guides" : "⊞ Guides"}
+          </button>
         </div>
       </div>
 
@@ -490,6 +531,49 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
             opacity: loaded && active ? 1 : 0,
             transition:"opacity .3s"}}
         />
+        {loaded && showGuides && guideData && guideData.guides && guideData.guides.length > 0 && (
+          <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",overflow:"visible",pointerEvents:"none"}}
+            viewBox={`0 0 ${CAM_W} ${CAM_H}`}
+            preserveAspectRatio="none">
+            {guideData.guides.map((g, idx) => {
+              const tol   = guideData.tolerance_px || 80;
+              const label = g.label || String.fromCharCode(65 + idx);
+              const lx1 = g.x1 ?? 0,       ly1 = g.y1 ?? g.y ?? 0;
+              const lx2 = g.x2 ?? CAM_W,   ly2 = g.y2 ?? g.y ?? 0;
+              const dx = lx2 - lx1, dy = ly2 - ly1;
+              const len = Math.hypot(dx, dy) || 1;
+              const nx = (-dy / len) * tol, ny = (dx / len) * tol;
+              const band = [
+                [lx1+nx, ly1+ny], [lx2+nx, ly2+ny],
+                [lx2-nx, ly2-ny], [lx1-nx, ly1-ny],
+              ].map(([x, y]) => `${x},${y}`).join(" ");
+              return (
+                <g key={idx}>
+                  {/* Rotated tolerance band */}
+                  <polygon points={band} fill="rgba(250,204,21,0.10)" stroke="none"/>
+                  {/* Band edges */}
+                  <line x1={lx1+nx} y1={ly1+ny} x2={lx2+nx} y2={ly2+ny}
+                    stroke="rgba(250,204,21,0.35)" strokeWidth={3} strokeDasharray="20 10"/>
+                  <line x1={lx1-nx} y1={ly1-ny} x2={lx2-nx} y2={ly2-ny}
+                    stroke="rgba(250,204,21,0.35)" strokeWidth={3} strokeDasharray="20 10"/>
+                  {/* Centre guide line */}
+                  <line x1={lx1} y1={ly1} x2={lx2} y2={ly2}
+                    stroke="#facc15" strokeWidth={6} strokeDasharray="30 14"/>
+                  {/* Endpoint dots */}
+                  <circle cx={lx1} cy={ly1} r={12} fill="#facc15"/>
+                  <circle cx={lx2} cy={ly2} r={12} fill="#facc15"/>
+                  {/* Label pill */}
+                  <rect x={lx1 + 16} y={ly1 - 26} width={120} height={30} rx={6}
+                    fill="rgba(0,0,0,.7)"/>
+                  <text x={lx1 + 22} y={ly1 - 5}
+                    fill="#facc15" fontSize={22} fontFamily="monospace" fontWeight="bold">
+                    Row {label}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        )}
         {loaded && active &&(
           <div style={{position:"absolute",bottom:10,right:12,
             background:"rgba(255,255,255,.95)",border:`1px solid ${C.border}`,
@@ -505,6 +589,21 @@ function LiveFeedPanel({piStatus, mode, videoSource, setVideoSource, playState, 
         fontFamily:C.mono,fontSize:10,color:C.muted,lineHeight:1.7}}>
         ℹ️ Stream runs at ~{STREAM_FPS_DISPLAY} FPS. YOLO detections update every 1s — boxes stay visible between inferences. Pause to reduce Pi CPU load.
       </div>
+
+      {snapshot && (
+        <div onClick={()=>{ URL.revokeObjectURL(snapshot); setSnapshot(null); }}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",
+            zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",
+            cursor:"zoom-out",overflow:"auto"}}>
+          <img src={snapshot} alt="YOLO debug snapshot"
+            style={{maxWidth:"95vw",maxHeight:"95vh",objectFit:"contain",
+              border:"2px solid rgba(255,255,255,.15)",borderRadius:4}}/>
+          <div style={{position:"fixed",top:16,right:20,color:"#fff",
+            fontFamily:C.mono,fontSize:11,opacity:.55,pointerEvents:"none"}}>
+            Click anywhere to close
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1825,21 +1924,31 @@ function DriverUISettingsPanel(){
 // Multi-step overlay: Step 1 = choose row guide method, Step 2 = draw guide lines
 // on a live-frame snapshot (manual only), Step 3 = layout mode + confirm.
 function RemapWizard({ piStatus, addLog, onClose }) {
-  const [step,        setStep]        = useState(1);          // 1 | 2 | 3 | 4 | 5
-  const [guideMethod, setGuideMethod] = useState("auto");     // "manual" | "auto"
-  const [layoutMode,  setLayoutMode]  = useState("auto");
-  const [rowLines,    setRowLines]    = useState([]);         // [{id, y}] in camera px
-  const [remapping,   setRemapping]   = useState(false);
-  const [remapMsg,    setRemapMsg]    = useState(null);
-  const [statusData,  setStatusData]  = useState({ mapping_phase: true, frame_count: 0, slots_loaded: 0 });
-  const [aiPhase,     setAiPhase]     = useState("idle");     // "idle"|"generating"|"review"|"error"
-  const [aiSlotCount, setAiSlotCount] = useState(0);
-  const [aiSlots,     setAiSlots]     = useState({});
-  const [aiError,     setAiError]     = useState("");
-  const [aiImageTs,   setAiImageTs]   = useState(0);
+  const [step,            setStep]            = useState(1);      // 1 | 2 | 3 | 4 | 5
+  const [guideMethod,     setGuideMethod]     = useState("auto"); // "manual" | "auto"
+  const [layoutMode,      setLayoutMode]      = useState("auto");
+  const [rowLines,        setRowLines]        = useState([]);     // [{id, x1, y1, x2, y2}] camera px
+  const [suggestingGuides,setSuggestingGuides]= useState(false);
+  const [remapping,       setRemapping]       = useState(false);
+  const [remapMsg,        setRemapMsg]        = useState(null);
+  const [statusData,      setStatusData]      = useState({ mapping_phase: true, frame_count: 0, slots_loaded: 0 });
+  const [aiPhase,         setAiPhase]         = useState("idle"); // "idle"|"generating"|"review"|"error"
+  const [aiSlotCount,     setAiSlotCount]     = useState(0);
+  const [aiSlots,         setAiSlots]         = useState({});
+  const [aiError,         setAiError]         = useState("");
+  const [aiImageTs,       setAiImageTs]       = useState(0);
+  const [excludedAiSlots, setExcludedAiSlots] = useState(new Set());
+  // Slot review state (step 4b — review DBSCAN slots before AI generate)
+  const [reviewSlots,     setReviewSlots]     = useState({});
+  const [reviewFrame,     setReviewFrame]     = useState(null);
+  const [markedForRemoval,setMarkedForRemoval]= useState(new Set());
+  const [reviewApplying,  setReviewApplying]  = useState(false);
+  const [showSlotReview,  setShowSlotReview]  = useState(false);
   const canvasRef = useRef(null);
   const frameImg  = useRef(null);    // HTMLImageElement holding the live-frame snapshot
-  const dragRef   = useRef(null);    // {lineId} while dragging a line
+  const dragRef        = useRef(null);    // {lineId, type:"p1"|"p2"|"line", prevX?, prevY?}
+  const drawingLineRef = useRef(null);   // {x1,y1} anchor while click-dragging a new line
+  const rowLinesRef    = useRef([]);     // always-current mirror of rowLines for async callbacks
 
   const LAYOUT_MODES = [
     {id:"horizontal", label:"Horizontal", hint:"Rows of slots side by side"},
@@ -1857,7 +1966,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
     const img = new Image();
     img.onload = () => {
       frameImg.current = img;
-      redraw(ctx, canvas.width, canvas.height, img, rowLines);
+      redraw(ctx, canvas.width, canvas.height, img, rowLinesRef.current);
     };
     img.onerror = () => {
       ctx.fillStyle = "#0a0e1a";
@@ -1870,6 +1979,29 @@ function RemapWizard({ piStatus, addLog, onClose }) {
     img.src = `${PI_API_URL}/live-frame?t=${Date.now()}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
+
+  // ── Auto-detect: fetch suggested guides on entering step 2 ───────────────────
+  useEffect(() => {
+    if (step !== 2 || guideMethod !== "auto") return;
+    setSuggestingGuides(true);
+    fetch(`${PI_API_URL}/remap/suggest-guides`, { signal: AbortSignal.timeout(5000) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.guides && d.guides.length > 0) {
+          setRowLines(d.guides.slice(0, 6).map((g, i) => ({
+            id: Date.now() + i,
+            x1: g.x1 ?? 0,       y1: g.y1 ?? g.y ?? 0,
+            x2: g.x2 ?? CAM_W,   y2: g.y2 ?? g.y ?? 0,
+          })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSuggestingGuides(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, guideMethod]);
+
+  // Keep ref current so async callbacks (img.onload) always see latest lines
+  useEffect(() => { rowLinesRef.current = rowLines; }, [rowLines]);
 
   // ── Redraw canvas whenever lines change ──────────────────────────────────────
   useEffect(() => {
@@ -1912,7 +2044,17 @@ function RemapWizard({ piStatus, addLog, onClose }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiPhase]);
 
-  const redraw = (ctx, W, H, img, lines) => {
+  const sortByMidY = (lines) =>
+    [...lines].sort((a, b) => ((a.y1 + a.y2) / 2) - ((b.y1 + b.y2) / 2));
+
+  const ptSegDist = (px, py, x1, y1, x2, y2) => {
+    const dx = x2 - x1, dy = y2 - y1, lenSq = dx*dx + dy*dy;
+    if (!lenSq) return Math.hypot(px - x1, py - y1);
+    const t = Math.max(0, Math.min(1, ((px-x1)*dx + (py-y1)*dy) / lenSq));
+    return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
+  };
+
+  const redraw = (ctx, W, H, img, lines, preview = null) => {
     ctx.clearRect(0, 0, W, H);
     if (img) {
       ctx.drawImage(img, 0, 0, W, H);
@@ -1920,72 +2062,110 @@ function RemapWizard({ piStatus, addLog, onClose }) {
       ctx.fillStyle = "#0a0e1a";
       ctx.fillRect(0, 0, W, H);
     }
-    lines.forEach((line, idx) => {
-      const cy = (line.y / CAM_H) * H;
+
+    const drawOneLine = (line, idx, alpha = 1) => {
+      const cx1 = (line.x1 / CAM_W) * W, cy1 = (line.y1 / CAM_H) * H;
+      const cx2 = (line.x2 / CAM_W) * W, cy2 = (line.y2 / CAM_H) * H;
       ctx.save();
-      ctx.strokeStyle = "#facc15";
-      ctx.lineWidth   = 2;
-      ctx.setLineDash([10, 6]);
-      ctx.beginPath();
-      ctx.moveTo(0, cy);
-      ctx.lineTo(W, cy);
-      ctx.stroke();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = "#facc15"; ctx.lineWidth = 2; ctx.setLineDash([10, 6]);
+      ctx.beginPath(); ctx.moveTo(cx1, cy1); ctx.lineTo(cx2, cy2); ctx.stroke();
       ctx.setLineDash([]);
-      // Label pill
-      const label = `Row ${String.fromCharCode(65 + idx)}`;
-      ctx.fillStyle = "rgba(0,0,0,.65)";
-      ctx.beginPath();
-      ctx.roundRect(6, cy - 14, 56, 20, 4);
-      ctx.fill();
-      ctx.fillStyle = "#facc15";
-      ctx.font = "bold 11px monospace";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, 10, cy);
-      // Drag handle (circle at right edge)
-      ctx.beginPath();
-      ctx.arc(W - 14, cy, 7, 0, Math.PI * 2);
-      ctx.fillStyle = "#facc15";
-      ctx.fill();
+      if (idx >= 0) {
+        const label = `Row ${String.fromCharCode(65 + idx)}`;
+        ctx.fillStyle = "rgba(0,0,0,.65)";
+        ctx.beginPath(); ctx.roundRect(cx1 + 6, cy1 - 14, 56, 20, 4); ctx.fill();
+        ctx.fillStyle = "#facc15"; ctx.font = "bold 11px monospace";
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText(label, cx1 + 10, cy1);
+      }
+      for (const [ex, ey] of [[cx1, cy1], [cx2, cy2]]) {
+        ctx.beginPath(); ctx.arc(ex, ey, 7, 0, Math.PI * 2);
+        ctx.fillStyle = "#facc15"; ctx.fill();
+      }
       ctx.restore();
-    });
+    };
+
+    lines.forEach((l, i) => drawOneLine(l, i, 1));
+    if (preview) drawOneLine(preview, -1, 0.5);
   };
 
-  const canvasToY = (e) => {
-    const canvas = canvasRef.current;
-    const rect   = canvas.getBoundingClientRect();
-    const scaleY = canvas.height / rect.height;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const canvasY = (clientY - rect.top) * scaleY;
-    return Math.round((canvasY / canvas.height) * CAM_H);
+  const canvasToPos = (e) => {
+    const canvas  = canvasRef.current;
+    const rect    = canvas.getBoundingClientRect();
+    const scaleX  = canvas.width  / rect.width;
+    const scaleY  = canvas.height / rect.height;
+    const src = (e.touches && e.touches.length) ? e.touches[0]
+              : (e.changedTouches && e.changedTouches.length) ? e.changedTouches[0]
+              : e;
+    return {
+      x: Math.round(((src.clientX - rect.left) * scaleX / canvas.width)  * CAM_W),
+      y: Math.round(((src.clientY - rect.top)  * scaleY / canvas.height) * CAM_H),
+    };
   };
 
   const onCanvasMouseDown = (e) => {
-    const y = canvasToY(e);
-    // Check if clicking near an existing line (within 12px in canvas space)
+    const { x: camX, y: camY } = canvasToPos(e);
     const canvas = canvasRef.current;
-    const scaleY = canvas.height / canvas.getBoundingClientRect().height;
-    const tolY   = (12 / scaleY) * (CAM_H / canvas.height);
-    const hit    = rowLines.find(l => Math.abs(l.y - y) < tolY);
-    if (hit) {
-      dragRef.current = hit.id;
-    } else {
-      if (rowLines.length >= 6) return;
-      const newLine = { id: Date.now(), y };
-      setRowLines(prev => [...prev, newLine].sort((a, b) => a.y - b.y));
+    const scaleX = canvas.width / CAM_W, scaleY = canvas.height / CAM_H;
+    const canvX = camX * scaleX, canvY = camY * scaleY;
+    const TOL = 16; // canvas pixels
+
+    for (const line of [...rowLines].reverse()) {
+      const cx1 = line.x1 * scaleX, cy1 = line.y1 * scaleY;
+      const cx2 = line.x2 * scaleX, cy2 = line.y2 * scaleY;
+      if (Math.hypot(canvX - cx1, canvY - cy1) <= TOL) {
+        dragRef.current = { lineId: line.id, type: "p1" }; return;
+      }
+      if (Math.hypot(canvX - cx2, canvY - cy2) <= TOL) {
+        dragRef.current = { lineId: line.id, type: "p2" }; return;
+      }
+      if (ptSegDist(canvX, canvY, cx1, cy1, cx2, cy2) <= TOL) {
+        dragRef.current = { lineId: line.id, type: "line", prevX: camX, prevY: camY }; return;
+      }
     }
+    if (rowLines.length < 6) drawingLineRef.current = { x1: camX, y1: camY };
   };
 
   const onCanvasMouseMove = (e) => {
-    if (!dragRef.current) return;
-    const y = canvasToY(e);
-    setRowLines(prev =>
-      [...prev.map(l => l.id === dragRef.current ? { ...l, y } : l)]
-        .sort((a, b) => a.y - b.y)
-    );
+    const { x: camX, y: camY } = canvasToPos(e);
+    if (dragRef.current) {
+      const { lineId, type } = dragRef.current;
+      setRowLines(prev => sortByMidY(prev.map(l => {
+        if (l.id !== lineId) return l;
+        if (type === "p1") return { ...l, x1: camX, y1: camY };
+        if (type === "p2") return { ...l, x2: camX, y2: camY };
+        if (type === "line") {
+          const dx = camX - dragRef.current.prevX, dy = camY - dragRef.current.prevY;
+          dragRef.current.prevX = camX; dragRef.current.prevY = camY;
+          return { ...l, x1: l.x1+dx, y1: l.y1+dy, x2: l.x2+dx, y2: l.y2+dy };
+        }
+        return l;
+      })));
+    } else if (drawingLineRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      const dl = drawingLineRef.current;
+      redraw(ctx, canvas.width, canvas.height, frameImg.current, rowLines,
+             { x1: dl.x1, y1: dl.y1, x2: camX, y2: camY });
+    }
   };
 
-  const onCanvasMouseUp = () => { dragRef.current = null; };
+  const onCanvasMouseUp = (e) => {
+    dragRef.current = null;
+    const dl = drawingLineRef.current;
+    if (dl) {
+      drawingLineRef.current = null;
+      const { x: camX, y: camY } = canvasToPos(e);
+      if (Math.hypot(camX - dl.x1, camY - dl.y1) > 30) {
+        setRowLines(prev => sortByMidY([...prev, { id: Date.now(), x1: dl.x1, y1: dl.y1, x2: camX, y2: camY }]));
+      } else {
+        // Tiny drag — redraw to clear ghost line
+        const canvas = canvasRef.current;
+        redraw(canvas.getContext("2d"), canvas.width, canvas.height, frameImg.current, rowLines);
+      }
+    }
+  };
 
   const triggerRemap = async () => {
     if (remapping) return;
@@ -1994,7 +2174,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
     try {
       const body = {
         layout_mode: layoutMode,
-        row_guides:  guideMethod === "manual" ? rowLines.map(l => l.y) : [],
+        row_guides:  rowLines.map(l => ({ x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 })),
       };
       const r = await fetch(`${PI_API_URL}/remap`, {
         method: "POST",
@@ -2004,16 +2184,45 @@ function RemapWizard({ piStatus, addLog, onClose }) {
       });
       await r.json();
       const modeLabel = LAYOUT_MODES.find(m => m.id === layoutMode)?.label ?? layoutMode;
-      const guideInfo = guideMethod === "manual" && rowLines.length > 0
-        ? ` with ${rowLines.length} row guide(s)`
+      const guideInfo = rowLines.length > 0
+        ? ` with ${rowLines.length} row guide(s)${guideMethod === "auto" ? " (auto-detected)" : ""}`
         : " (auto row detection)";
       addLog(`[ADMIN] Remap triggered — ${modeLabel} mode${guideInfo}.`, "sys");
+      setShowSlotReview(false);
+      setMarkedForRemoval(new Set());
       setStep(4);
     } catch (e) {
       setRemapMsg({ ok: false, text: `Remap failed: ${e.message}` });
     } finally {
       setRemapping(false);
     }
+  };
+
+  const openSlotReview = async () => {
+    setShowSlotReview(true);
+    setMarkedForRemoval(new Set());
+    try {
+      const [slotsR, frameR] = await Promise.all([
+        fetch(`${PI_API_URL}/slots`,                         { signal: AbortSignal.timeout(5000) }),
+        fetch(`${PI_API_URL}/live-frame?t=${Date.now()}`,   { signal: AbortSignal.timeout(5000) }),
+      ]);
+      setReviewSlots(await slotsR.json());
+      const blob = await frameR.blob();
+      setReviewFrame(URL.createObjectURL(blob));
+    } catch {}
+  };
+
+  const applySlotReview = async () => {
+    setReviewApplying(true);
+    try {
+      await Promise.all([...markedForRemoval].map(id =>
+        fetch(`${PI_API_URL}/slots/${id}`, { method: "DELETE", signal: AbortSignal.timeout(5000) })
+      ));
+      if (markedForRemoval.size > 0)
+        addLog(`[ADMIN] Removed ${markedForRemoval.size} incorrect slot(s) from DBSCAN result.`, "sys");
+    } catch {}
+    setShowSlotReview(false);
+    setReviewApplying(false);
   };
 
   const triggerAiGenerate = async () => {
@@ -2037,10 +2246,13 @@ function RemapWizard({ piStatus, addLog, onClose }) {
     try {
       const r = await fetch(`${PI_API_URL}/ai-mapping/confirm`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exclude: [...excludedAiSlots] }),
         signal: AbortSignal.timeout(8000),
       });
       const d = await r.json();
-      addLog(`[AI] Confirmed ${d.saved} AI-generated slots (total ${d.total}).`, "sys");
+      const excl = excludedAiSlots.size > 0 ? ` (excluded ${excludedAiSlots.size})` : "";
+      addLog(`[AI] Confirmed ${d.saved} AI-generated slots${excl} (total ${d.total}).`, "sys");
       onClose();
     } catch (e) {
       setAiError(e.message);
@@ -2075,7 +2287,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.75)", display:"flex",
       alignItems:"center", justifyContent:"center", zIndex:1000, backdropFilter:"blur(6px)" }}>
       <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 20,
-        width: step === 2 || step === 5 ? "min(92vw, 860px)" : "min(92vw, 500px)",
+        width: step === 2 || step === 4 || step === 5 ? "min(92vw, 860px)" : "min(92vw, 500px)",
         maxHeight: "92vh", overflowY: "auto",
         display:"flex", flexDirection:"column", gap:0, animation:"fadeUp .2s ease" }}>
 
@@ -2089,11 +2301,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
             <div style={{ fontFamily:C.mono, fontSize:10, color:C.muted, marginTop:2 }}>
               {(() => {
                 const labels = ["Choose row guide method","Draw row guide lines","Choose layout & confirm","Mapping in progress","Review AI slots"];
-                const total  = guideMethod === "auto" ? 4 : 5;
-                const num    = guideMethod === "auto"
-                  ? (step <= 1 ? 1 : step === 3 ? 2 : step === 4 ? 3 : 4)
-                  : step;
-                return `Step ${num} of ${total} — ${labels[step - 1] ?? ""}`;
+                return `Step ${step} of 5 — ${labels[step - 1] ?? ""}`;
               })()}
             </div>
           </div>
@@ -2103,7 +2311,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
 
         {/* Step indicator */}
         <div style={{ display:"flex", gap:4, padding:"12px 20px 0" }}>
-          {[1,2,3,4,5].filter(s => guideMethod === "auto" ? s !== 2 : true).map(s => (
+          {[1,2,3,4,5].map(s => (
             <div key={s} style={{ flex:1, height:3, borderRadius:2,
               background: s <= step ? C.purple : "rgba(0,0,0,.08)" }}/>
           ))}
@@ -2142,7 +2350,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                   </div>
                 ))}
               </div>
-              <button onClick={() => setStep(guideMethod === "manual" ? 2 : 3)}
+              <button onClick={() => setStep(2)}
                 style={{ padding:"11px", borderRadius:10, border:"none", cursor:"pointer",
                   background:`linear-gradient(135deg,${C.purple},${C.accent})`,
                   color:"#fff", fontFamily:C.sans, fontWeight:700, fontSize:13 }}>
@@ -2158,8 +2366,11 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                 Draw row guide lines
               </div>
               <div style={{ fontFamily:C.mono, fontSize:10, color:C.muted, lineHeight:1.7 }}>
-                Click on the image to place a yellow row line. Drag a line to reposition it.
-                Each line marks the centre of a parking row. Max 6 lines.
+                {guideMethod === "auto"
+                  ? suggestingGuides
+                    ? "Auto-detecting row positions from current vehicle data…"
+                    : "Guide lines auto-detected from current vehicles. Drag lines or their endpoints to adjust."
+                  : "Click the image to add a row line. Drag the line body to reposition it vertically. Drag either endpoint to shorten or extend the line. Max 6 lines."}
               </div>
               <div style={{ position:"relative", borderRadius:10, overflow:"hidden",
                 border:`1.5px solid ${C.border}` }}>
@@ -2178,7 +2389,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                     alignItems:"center", justifyContent:"center", pointerEvents:"none" }}>
                     <div style={{ background:"rgba(0,0,0,.6)", borderRadius:10,
                       padding:"10px 18px", fontFamily:C.mono, fontSize:11, color:"#facc15" }}>
-                      Click anywhere to add a row line
+                      Click and drag to draw a row guide line
                     </div>
                   </div>
                 )}
@@ -2187,7 +2398,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                 <button onClick={() => {
                   const mid = Math.round(CAM_H / 2);
                   setRowLines(prev => prev.length < 6
-                    ? [...prev, { id: Date.now(), y: mid }].sort((a,b)=>a.y-b.y)
+                    ? sortByMidY([...prev, { id: Date.now(), x1: 0, y1: mid, x2: CAM_W, y2: mid }])
                     : prev);
                 }} disabled={rowLines.length >= 6}
                   style={{ padding:"6px 14px", borderRadius:8, border:`1px solid ${C.accent}44`,
@@ -2214,7 +2425,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                       <span style={{ color:"#facc15", fontWeight:700 }}>
                         Row {String.fromCharCode(65+i)}
                       </span>
-                      <span style={{ color:C.muted }}>y={l.y}px</span>
+                      <span style={{ color:C.muted }}>({l.x1},{l.y1})→({l.x2},{l.y2})</span>
                       <button onClick={() => setRowLines(prev => prev.filter(x => x.id !== l.id))}
                         style={{ background:"none", border:"none", color:C.muted, cursor:"pointer",
                           fontSize:12, lineHeight:1, padding:"0 2px" }}>✕</button>
@@ -2247,14 +2458,12 @@ function RemapWizard({ piStatus, addLog, onClose }) {
               </div>
               {/* Summary of row guide choice */}
               <div style={{ padding:"10px 14px", borderRadius:10,
-                background: guideMethod==="manual"&&rowLines.length>0
-                  ? "rgba(250,204,21,.1)" : "rgba(124,58,237,.08)",
-                border:`1px solid ${guideMethod==="manual"&&rowLines.length>0
-                  ? "rgba(250,204,21,.3)" : "rgba(124,58,237,.25)"}`,
+                background: rowLines.length>0 ? "rgba(250,204,21,.1)" : "rgba(124,58,237,.08)",
+                border:`1px solid ${rowLines.length>0 ? "rgba(250,204,21,.3)" : "rgba(124,58,237,.25)"}`,
                 fontFamily:C.mono, fontSize:11, color:C.muted }}>
-                {guideMethod==="manual"&&rowLines.length>0
-                  ? `✏️ ${rowLines.length} manual row guide${rowLines.length>1?"s":""} set`
-                  : "🤖 Row guides will be auto-detected"}
+                {rowLines.length>0
+                  ? `${guideMethod==="auto"?"🤖":"✏️"} ${rowLines.length} row guide${rowLines.length>1?"s":""} set${guideMethod==="auto"?" (auto-detected)":""}`
+                  : "🤖 Row guides will be auto-detected during mapping"}
               </div>
               <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                 {LAYOUT_MODES.map(m => (
@@ -2282,7 +2491,7 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                 </div>
               )}
               <div style={{ display:"flex", gap:8 }}>
-                <button onClick={() => setStep(guideMethod==="manual" ? 2 : 1)}
+                <button onClick={() => setStep(2)}
                   style={{ flex:1, padding:"10px", borderRadius:10,
                     border:`1px solid ${C.border}`, background:"transparent",
                     color:C.muted, fontFamily:C.sans, fontWeight:700, fontSize:13, cursor:"pointer" }}>
@@ -2331,13 +2540,19 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                   </span>
                 )}
               </div>
-              {!statusData.mapping_phase && aiPhase !== "generating" && aiPhase !== "error" && (
+              {!statusData.mapping_phase && aiPhase !== "generating" && aiPhase !== "error" && !showSlotReview && (
                 <>
                   <div style={{ fontFamily:C.mono, fontSize:10, color:C.muted,
                     padding:"10px 12px", borderRadius:8, background:"rgba(0,0,0,.04)", lineHeight:1.8 }}>
-                    The auto-mapper found slots from real cars. Optionally, use AI to discover
-                    all possible parking spots by generating a fully-parked version of the lot.
+                    The auto-mapper found slots from real cars. Review and remove any incorrect slots,
+                    then optionally use AI to discover all possible parking spots.
                   </div>
+                  <button onClick={openSlotReview}
+                    style={{ padding:"11px", borderRadius:10, border:`1px solid ${C.purple}44`,
+                      background:`${C.purple}12`,
+                      color:C.purple, fontFamily:C.sans, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                    🔍 Review Detected Slots
+                  </button>
                   <button onClick={triggerAiGenerate}
                     style={{ padding:"11px", borderRadius:10, border:"none", cursor:"pointer",
                       background:"linear-gradient(135deg,#7c3aed,#ec4899)",
@@ -2351,6 +2566,78 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                       fontFamily:C.sans, fontWeight:700, fontSize:13, cursor:"pointer" }}>
                     Finish (keep DBSCAN slots only)
                   </button>
+                </>
+              )}
+              {/* ── Slot review overlay ─────────────────────────────────────── */}
+              {!statusData.mapping_phase && showSlotReview && (
+                <>
+                  <div style={{ fontFamily:C.sans, fontWeight:700, fontSize:13 }}>
+                    Review Detected Slots
+                  </div>
+                  <div style={{ fontFamily:C.mono, fontSize:10, color:C.muted, lineHeight:1.7 }}>
+                    Click a slot to mark it for removal (turns red). Incorrect slots — e.g. from cones or people — can be removed before proceeding.
+                  </div>
+                  <div style={{ position:"relative", borderRadius:10, overflow:"hidden",
+                    border:`1.5px solid ${C.border}`, background:"#0a0e1a" }}>
+                    {reviewFrame
+                      ? <img src={reviewFrame} alt="camera frame" style={{ width:"100%", display:"block" }}/>
+                      : <div style={{ height:200, display:"flex", alignItems:"center", justifyContent:"center",
+                          fontFamily:C.mono, fontSize:11, color:C.muted }}>Loading frame…</div>}
+                    {reviewFrame && (
+                      <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%",
+                        overflow:"visible" }}
+                        viewBox={`0 0 ${CAM_W} ${CAM_H}`}
+                        preserveAspectRatio="none">
+                        {Object.entries(reviewSlots).map(([id, s]) => {
+                          const pts = (s.coords || []).map(p => `${p[0]},${p[1]}`).join(" ");
+                          const marked = markedForRemoval.has(id);
+                          return pts ? (
+                            <g key={id} style={{ cursor:"pointer" }} onClick={() => setMarkedForRemoval(prev => {
+                              const next = new Set(prev);
+                              if (next.has(id)) next.delete(id); else next.add(id);
+                              return next;
+                            })}>
+                              <polygon points={pts}
+                                fill={marked ? "rgba(244,63,94,0.45)" : "rgba(34,197,94,0.2)"}
+                                stroke={marked ? "#f43f5e" : "#22c55e"}
+                                strokeWidth={12}/>
+                              <text
+                                x={(s.coords||[]).reduce((a,p)=>a+p[0],0)/(s.coords?.length||1)}
+                                y={(s.coords||[]).reduce((a,p)=>a+p[1],0)/(s.coords?.length||1)}
+                                textAnchor="middle" dominantBaseline="middle"
+                                fill={marked?"#f43f5e":"#22c55e"} fontSize={28}
+                                fontFamily="monospace" fontWeight="bold">
+                                {marked ? "✕" : id}
+                              </text>
+                            </g>
+                          ) : null;
+                        })}
+                      </svg>
+                    )}
+                  </div>
+                  <div style={{ fontFamily:C.mono, fontSize:10, color:C.muted }}>
+                    {markedForRemoval.size > 0
+                      ? `${markedForRemoval.size} slot${markedForRemoval.size>1?"s":""} marked for removal`
+                      : "No slots marked — click a slot to mark it"}
+                  </div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={() => setShowSlotReview(false)}
+                      style={{ flex:1, padding:"10px", borderRadius:10,
+                        border:`1px solid ${C.border}`, background:"transparent",
+                        color:C.muted, fontFamily:C.sans, fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                      Cancel
+                    </button>
+                    <button onClick={applySlotReview} disabled={reviewApplying}
+                      style={{ flex:2, padding:"11px", borderRadius:10, border:"none",
+                        cursor:reviewApplying?"not-allowed":"pointer",
+                        background:`linear-gradient(135deg,${C.purple},${C.accent})`,
+                        color:"#fff", fontFamily:C.sans, fontWeight:700, fontSize:13,
+                        opacity:reviewApplying?.7:1 }}>
+                      {markedForRemoval.size > 0
+                        ? `Remove ${markedForRemoval.size} & Continue`
+                        : "Keep All & Continue"}
+                    </button>
+                  </div>
                 </>
               )}
               {aiPhase === "generating" && (
@@ -2408,6 +2695,12 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                     Confirm to apply them (merged with DBSCAN slots), or reject to keep
                     only the original auto-mapped slots.
                   </div>
+                  <div style={{ fontFamily:C.mono, fontSize:10, color:C.muted, lineHeight:1.6,
+                    padding:"6px 10px", borderRadius:8, background:"rgba(250,204,21,.07)",
+                    border:"1px solid rgba(250,204,21,.2)" }}>
+                    💡 Click a slot on the AI image to mark it for exclusion (turns red). Excluded slots won't be applied.
+                    {excludedAiSlots.size > 0 && <span style={{ color:C.occ }}> · {excludedAiSlots.size} excluded</span>}
+                  </div>
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                     <div>
                       <div style={{ fontFamily:C.mono, fontSize:10, color:C.muted, marginBottom:4 }}>
@@ -2421,22 +2714,31 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                     </div>
                     <div>
                       <div style={{ fontFamily:C.mono, fontSize:10, color:C.muted, marginBottom:4 }}>
-                        AI-generated (all slots filled) — <span style={{ color:C.purple }}>{aiSlotCount} slots</span>
+                        AI-generated — <span style={{ color:C.purple }}>{aiSlotCount} slots</span>
+                        {excludedAiSlots.size > 0 && <span style={{ color:C.occ }}> · {excludedAiSlots.size} excluded</span>}
                       </div>
                       <div style={{ borderRadius:8, overflow:"hidden",
                         border:`1px solid ${C.border}`, position:"relative" }}>
                         <img src={`${PI_API_URL}/ai-mapping/generated-image?t=${aiImageTs}`}
                           style={{ width:"100%", display:"block" }} alt="AI generated" />
                         <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%",
-                          pointerEvents:"none" }}
+                          overflow:"visible" }}
                           viewBox={`0 0 ${CAM_W} ${CAM_H}`}
                           preserveAspectRatio="none">
                           {Object.entries(aiSlots).map(([id, s]) => {
                             const pts = (s.coords || []).map(p => `${p[0]},${p[1]}`).join(" ");
+                            const excl = excludedAiSlots.has(id);
                             return pts ? (
                               <polygon key={id} points={pts}
-                                fill="rgba(250,204,21,0.25)"
-                                stroke="#facc15" strokeWidth={14} />
+                                fill={excl ? "rgba(244,63,94,0.45)" : "rgba(250,204,21,0.25)"}
+                                stroke={excl ? "#f43f5e" : "#facc15"}
+                                strokeWidth={14}
+                                style={{ cursor:"pointer", pointerEvents:"all" }}
+                                onClick={() => setExcludedAiSlots(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(id)) next.delete(id); else next.add(id);
+                                  return next;
+                                })}/>
                             ) : null;
                           })}
                         </svg>
@@ -2449,14 +2751,16 @@ function RemapWizard({ piStatus, addLog, onClose }) {
                         cursor:"pointer",
                         background:`linear-gradient(135deg,${C.vac},#16a34a)`,
                         color:"#fff", fontFamily:C.sans, fontWeight:700, fontSize:13 }}>
-                      Confirm & Apply
+                      {excludedAiSlots.size > 0
+                        ? `Apply ${aiSlotCount - excludedAiSlots.size} Slots`
+                        : "Confirm & Apply All"}
                     </button>
                     <button onClick={rejectAiSlots}
                       style={{ flex:1, padding:"10px", borderRadius:10,
                         border:`1px solid ${C.occ}44`, background:`${C.occ}12`,
                         color:C.occ, fontFamily:C.sans, fontWeight:700, fontSize:13,
                         cursor:"pointer" }}>
-                      Reject
+                      Reject All
                     </button>
                   </div>
                 </>
