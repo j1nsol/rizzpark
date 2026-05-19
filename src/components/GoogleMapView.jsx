@@ -132,6 +132,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
   const userCircleRef = useRef(null);
   const watchIdRef    = useRef(null);
   const userPosRef    = useRef(null);  // always-fresh copy for DOM event handlers
+  const iconModeRef   = useRef(null);  // 'dot' | 'arrow' — avoids setIcon on every tick
 
   // Route refs
   const routeLayerRef      = useRef(null);
@@ -247,33 +248,47 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       userCircleRef.current.setLatLng(latlng).setRadius(userPos.accuracy);
     } else {
       userCircleRef.current = L.circle(latlng, {
-        radius:      userPos.accuracy,
-        color:       '#4A90E2',
-        fillColor:   '#4A90E2',
-        fillOpacity: 0.10,
-        weight:      1,
+        radius: userPos.accuracy, color: '#4A90E2',
+        fillColor: '#4A90E2', fillOpacity: 0.10, weight: 1,
       }).addTo(map);
     }
 
     const hasHeading = navTarget && userPos.heading != null && !isNaN(userPos.heading);
-    const dotIcon = hasHeading
-      ? L.divIcon({
-          html: `<svg width="22" height="28" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg"
-                  style="transform:rotate(${userPos.heading}deg);transform-origin:11px 14px;filter:drop-shadow(0 2px 5px rgba(74,144,226,.55))">
-                  <path d="M11 2L20 24L11 18L2 24Z" fill="#4A90E2" stroke="white" stroke-width="1.8" stroke-linejoin="round"/>
-                </svg>`,
-          className: '',
-          iconSize:   [22, 28],
-          iconAnchor: [11, 14],
-        })
-      : L.divIcon({ className: 'user-dot', iconSize: [16, 16], iconAnchor: [8, 8] });
+    const newMode = hasHeading ? 'arrow' : 'dot';
 
-    if (userMarkerRef.current) {
-      userMarkerRef.current.setLatLng(latlng).setIcon(dotIcon);
+    if (!userMarkerRef.current) {
+      // First render — create the marker
+      const icon = newMode === 'arrow'
+        ? L.divIcon({
+            html: `<svg width="22" height="28" viewBox="0 0 22 28" fill="none" style="transform-origin:11px 14px;filter:drop-shadow(0 2px 5px rgba(74,144,226,.55))"><path d="M11 2L20 24L11 18L2 24Z" fill="#4A90E2" stroke="white" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+            className: '', iconSize: [22, 28], iconAnchor: [11, 14],
+          })
+        : L.divIcon({ className: 'user-dot', iconSize: [16, 16], iconAnchor: [8, 8] });
+      userMarkerRef.current = L.marker(latlng, { icon, zIndexOffset: 1000 }).addTo(map);
+      iconModeRef.current = newMode;
     } else {
-      userMarkerRef.current = L.marker(latlng, { icon: dotIcon, zIndexOffset: 1000 }).addTo(map);
+      // Move marker — no DOM removal/re-add
+      userMarkerRef.current.setLatLng(latlng);
+
+      if (iconModeRef.current !== newMode) {
+        // Only call setIcon when switching between dot and arrow
+        const icon = newMode === 'arrow'
+          ? L.divIcon({
+              html: `<svg width="22" height="28" viewBox="0 0 22 28" fill="none" style="transform-origin:11px 14px;filter:drop-shadow(0 2px 5px rgba(74,144,226,.55))"><path d="M11 2L20 24L11 18L2 24Z" fill="#4A90E2" stroke="white" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+              className: '', iconSize: [22, 28], iconAnchor: [11, 14],
+            })
+          : L.divIcon({ className: 'user-dot', iconSize: [16, 16], iconAnchor: [8, 8] });
+        userMarkerRef.current.setIcon(icon);
+        iconModeRef.current = newMode;
+      }
     }
-  }, [userPos]);
+
+    // Update rotation directly on the existing SVG element — no flicker
+    if (newMode === 'arrow') {
+      const svg = userMarkerRef.current.getElement()?.querySelector('svg');
+      if (svg) svg.style.transform = `rotate(${userPos.heading}deg)`;
+    }
+  }, [userPos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Navigation helpers ───────────────────────────────────────────────────
   const fetchRoute = useCallback(async (pin, pos, silent = false) => {
@@ -654,6 +669,19 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
                 disabled={searching}
                 autoComplete="off"
               />
+              {query && (
+                <button
+                  type="button"
+                  className="map-search-clear"
+                  onMouseDown={e => { e.preventDefault(); setQuery(''); setSuggestions([]); setSearchErr(null); searchInputRef.current?.focus(); }}
+                  tabIndex={-1}
+                  aria-label="Clear search"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: 'block' }}>
+                    <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              )}
               {searchErr && <span className="map-search-err">{searchErr}</span>}
 
               {(suggestions.length > 0 || sugLoading) && (
