@@ -691,6 +691,42 @@ select.twk-field{padding-right:22px;
   background: var(--surface); padding: 3px 8px; border-radius: 6px;
   border: 1px solid var(--occupied-border); z-index: 10;
 }
+
+/* ── Search suggestions dropdown ── */
+.map-suggestions {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--border-2);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+  list-style: none; margin: 0; padding: 4px 0;
+  z-index: 9999;
+  max-height: 220px; overflow-y: auto;
+}
+.map-suggestion-loading {
+  padding: 10px 12px; font-size: 12px; color: var(--text-3);
+}
+.map-suggestion-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 12px; cursor: pointer;
+  color: var(--text-2); transition: background .1s;
+}
+.map-suggestion-item:hover,
+.map-suggestion-item.active { background: var(--bg); color: var(--text); }
+.map-suggestion-main {
+  font-size: 13px; font-weight: 600; color: inherit;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.map-suggestion-sub {
+  font-size: 11px; color: var(--text-3); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.map-suggestion-pin-badge {
+  font-size: 10px; font-weight: 700; line-height: 1;
+  padding: 2px 6px; border-radius: 10px; flex-shrink: 0;
+  background: var(--accent-pale); color: var(--accent);
+  border: 1px solid var(--accent);
+}
 .map-search-btn {
   height: 34px; padding: 0 16px; border-radius: var(--r-sm); flex-shrink: 0;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
