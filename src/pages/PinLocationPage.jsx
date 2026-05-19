@@ -167,7 +167,7 @@ export default function PinLocationPage() {
         <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} pinsOccupancy={pinsOccupancy} currentPinCode={pinCode} />
       )}
 
-      <DoneParkingBar suppressed={suppressed} onToggle={handleSuppressToggle} />
+      {!showMap && <DoneParkingBar suppressed={suppressed} onToggle={handleSuppressToggle} />}
     </div>
   );
 }

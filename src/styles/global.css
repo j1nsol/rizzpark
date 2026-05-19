@@ -693,7 +693,7 @@ select.twk-field{padding-right:22px;
 
 /* Search form and input */
 .map-search-form { display: flex; align-items: center; gap: 8px; flex: 1; }
-.map-search-wrap { position: relative; flex: 1; display: flex; align-items: center; }
+.map-search-wrap { position: relative; flex: 1; display: flex; align-items: center; z-index: 10000; }
 .map-search-icon {
   position: absolute; left: 12px; color: var(--text-3); pointer-events: none;
 }
@@ -710,7 +710,7 @@ select.twk-field{padding-right:22px;
   position: absolute; top: calc(100% + 4px); left: 0;
   font-size: 11px; color: var(--occupied); white-space: nowrap;
   background: var(--surface); padding: 3px 8px; border-radius: 6px;
-  border: 1px solid var(--occupied-border); z-index: 10;
+  border: 1px solid var(--occupied-border); z-index: 10000;
 }
 
 /* ── Search suggestions dropdown ── */
