@@ -103,7 +103,7 @@ export default function App() {
   return (
     <div className="app" style={accentStyle}>
       {showOnboarding && (
-        <OnboardingOverlay onDismiss={() => { setShowOnboarding(false); setShowMapIntro(true); }} />
+        <OnboardingOverlay onDismiss={() => { setShowOnboarding(false); if (window.innerWidth > 480) setShowMapIntro(true); }} />
       )}
 
       <Topbar

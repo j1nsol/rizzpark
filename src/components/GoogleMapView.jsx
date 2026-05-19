@@ -25,6 +25,79 @@ function fmtTime(s) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+function stepInstruction(step) {
+  if (!step) return '';
+  const { type, modifier } = step.maneuver;
+  const street = step.name ? ` onto ${step.name}` : '';
+  if (type === 'depart')      return `Head ${modifier ?? 'forward'}${street}`;
+  if (type === 'arrive')      return 'You have arrived';
+  if (type === 'turn')        return `Turn ${modifier}${street}`;
+  if (type === 'new name')    return `Continue${street}`;
+  if (type === 'continue')    return `Continue ${modifier ?? 'straight'}`;
+  if (type === 'merge')       return `Merge ${modifier}`;
+  if (type === 'on ramp')     return `Take the ramp ${modifier}`;
+  if (type === 'off ramp')    return `Take the exit ${modifier}`;
+  if (type === 'fork')        return `Keep ${modifier} at the fork`;
+  if (type === 'end of road') return `Turn ${modifier} at end of road`;
+  if (type === 'roundabout' || type === 'rotary') return 'Enter the roundabout';
+  return `${modifier ? modifier + ' — ' : ''}${step.name || 'Continue'}`.trim();
+}
+
+function getTurnArrow(step) {
+  if (!step) return null;
+  const mod = step.maneuver?.modifier ?? 'straight';
+  const type = step.maneuver?.type;
+  if (type === 'arrive') return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <circle cx="11" cy="11" r="5" stroke="#4A90E2" strokeWidth="2"/>
+      <circle cx="11" cy="11" r="2" fill="#4A90E2"/>
+    </svg>
+  );
+  if (mod === 'right' || mod === 'sharp right') return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M6 16V9a5 5 0 0 1 5-5h0" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M8 7l3-3 3 3" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M11 4v3" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M16 10v6" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M14 14l2 2 2-2" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  if (mod === 'left' || mod === 'sharp left') return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M16 16V9a5 5 0 0 0-5-5h0" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M14 7l-3-3-3 3" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M11 4v3" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M6 10v6" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M8 14l-2 2-2-2" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  if (mod === 'slight right') return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M7 17L15 7" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M10 7h5v5" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  if (mod === 'slight left') return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M15 17L7 7" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M12 7H7v5" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  if (mod === 'uturn') return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M7 16V9a4 4 0 0 1 8 0v7" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M13 14l2 2-2 2" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  // default: straight up arrow
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M11 18V6" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M7 10l4-4 4 4" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 function makeMarkerIcon(isAvailable, occ) {
   let badgeHtml = '';
   if (occ && occ.total > 0) {
@@ -59,11 +132,12 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
   const watchIdRef    = useRef(null);
   const userPosRef    = useRef(null);  // always-fresh copy for DOM event handlers
 
-  // Route ref
-  const routeLayerRef        = useRef(null);
-  const startNavigationRef   = useRef(null); // stable ref so popup onclicks stay fresh
-  const lastRoutePosRef      = useRef(null); // position where route was last fetched
-  const navLoadingRef        = useRef(false);
+  // Route refs
+  const routeLayerRef      = useRef(null);
+  const startNavigationRef = useRef(null);
+  const lastRoutePosRef    = useRef(null);
+  const navLoadingRef      = useRef(false);
+  const routeGeomRef       = useRef(null); // flat [{lat,lng}] for off-route checks
 
   // Search state
   const [query,       setQuery]       = useState('');
@@ -83,11 +157,11 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
   const [locErr,  setLocErr]  = useState(null);
 
   // Navigation state
-  const [navTarget,  setNavTarget]  = useState(null);
-  const [navRoute,   setNavRoute]   = useState(null);
-  const [navLoading, setNavLoading] = useState(false);
-  const [navErr,     setNavErr]     = useState(null);
-
+  const [navTarget,      setNavTarget]      = useState(null);
+  const [navRoute,       setNavRoute]       = useState(null);
+  const [navLoading,     setNavLoading]     = useState(false);
+  const [navErr,         setNavErr]         = useState(null);
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
   // ── Map init ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (instanceRef.current) return;
@@ -124,7 +198,12 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       pos => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        const p = {
+          lat:      pos.coords.latitude,
+          lng:      pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          heading:  pos.coords.heading, // degrees 0–360, or null when stationary
+        };
         userPosRef.current = p;
         setUserPos(p);
         setLocErr(null);
@@ -159,9 +238,21 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       }).addTo(map);
     }
 
-    const dotIcon = L.divIcon({ className: 'user-dot', iconSize: [16, 16], iconAnchor: [8, 8] });
+    const hasHeading = navTarget && userPos.heading != null && !isNaN(userPos.heading);
+    const dotIcon = hasHeading
+      ? L.divIcon({
+          html: `<svg width="22" height="28" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg"
+                  style="transform:rotate(${userPos.heading}deg);transform-origin:11px 14px;filter:drop-shadow(0 2px 5px rgba(74,144,226,.55))">
+                  <path d="M11 2L20 24L11 18L2 24Z" fill="#4A90E2" stroke="white" stroke-width="1.8" stroke-linejoin="round"/>
+                </svg>`,
+          className: '',
+          iconSize:   [22, 28],
+          iconAnchor: [11, 14],
+        })
+      : L.divIcon({ className: 'user-dot', iconSize: [16, 16], iconAnchor: [8, 8] });
+
     if (userMarkerRef.current) {
-      userMarkerRef.current.setLatLng(latlng);
+      userMarkerRef.current.setLatLng(latlng).setIcon(dotIcon);
     } else {
       userMarkerRef.current = L.marker(latlng, { icon: dotIcon, zIndexOffset: 1000 }).addTo(map);
     }
@@ -191,8 +282,12 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
         duration: data.routes[0].duration,
         steps:    leg.steps,
       });
+      if (!silent) setCurrentStepIdx(0);
 
-      // Draw new layer first, then remove old one — no flicker
+      // Store geometry as flat [{lat,lng}] for off-route checks
+      routeGeomRef.current = data.routes[0].geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
+
+      // Draw new layer first, then remove old — no flicker
       const newLayer = L.geoJSON(data.routes[0].geometry, {
         style: { color: '#4A90E2', weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' },
       }).addTo(instanceRef.current);
@@ -201,6 +296,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       routeLayerRef.current = newLayer;
 
       if (!silent) instanceRef.current.fitBounds(newLayer.getBounds(), { padding: [40, 40] });
+      setNavErr(null);
     } catch {
       if (!silent) setNavErr('Could not get route. Check your connection.');
     } finally {
@@ -227,16 +323,55 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
     setNavRoute(null);
     setNavErr(null);
     setNavLoading(false);
+    setCurrentStepIdx(0);
+    routeGeomRef.current = null;
     if (routeLayerRef.current) { routeLayerRef.current.remove(); routeLayerRef.current = null; }
   }
 
-  // Refresh route as user moves — only when moved >30 m from last route start
+  // Navigation tracking: auto-pan + step advancement + off-route detection
   useEffect(() => {
     const pos = userPosRef.current;
-    if (!navTarget || !pos) return;
-    const last = lastRoutePosRef.current;
-    if (last && metersBetween(last, pos) < 30) return;
-    fetchRoute(navTarget, pos, true); // silent=true keeps old line visible, no fitBounds
+    const map = instanceRef.current;
+    if (!navTarget || !pos || !map) return;
+
+    // 1. Keep user centred on map
+    map.panTo([pos.lat, pos.lng], { animate: true, duration: 0.6 });
+
+    // 2. Advance to next step when within 25 m of the upcoming maneuver point
+    if (navRoute) {
+      const nextStep = navRoute.steps[currentStepIdx + 1];
+      if (nextStep) {
+        const [nLng, nLat] = nextStep.maneuver.location;
+        if (metersBetween(pos, { lat: nLat, lng: nLng }) < 25) {
+          setCurrentStepIdx(i => Math.min(i + 1, navRoute.steps.length - 1));
+        }
+      }
+    }
+
+    // 3. Off-route check (>50 m from route) → reroute; otherwise refresh every 30 m
+    if (!navLoadingRef.current) {
+      const last = lastRoutePosRef.current;
+
+      let offRoute = false;
+      if (routeGeomRef.current) {
+        let minDist = Infinity;
+        const geom = routeGeomRef.current;
+        for (let i = 0; i < geom.length; i += 3) {
+          const d = metersBetween(pos, geom[i]);
+          if (d < minDist) minDist = d;
+          if (minDist < 50) break; // early exit once clearly on-route
+        }
+        offRoute = minDist > 50;
+      }
+
+      if (offRoute) {
+        setNavErr('Rerouting…');
+        setCurrentStepIdx(0);
+        fetchRoute(navTarget, pos, true);
+      } else if (!last || metersBetween(last, pos) >= 30) {
+        fetchRoute(navTarget, pos, true);
+      }
+    }
   }, [userPos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Parking pin markers ─────────────────────────────────────────────────
@@ -324,7 +459,10 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
         `cursor:pointer;border-radius:0 0 8px 8px;letter-spacing:.01em;transition:opacity .15s`;
       viewBtn.onmouseover = () => { viewBtn.style.opacity = '0.88'; };
       viewBtn.onmouseout  = () => { viewBtn.style.opacity = '1'; };
-      viewBtn.onclick = isCurrentPin ? onClose : () => navigate(`/${pin.pinCode}`);
+      viewBtn.onclick = () => {
+        if (isCurrentPin) { instanceRef.current?.closePopup(); onClose(); }
+        else { window.location.href = `/${pin.pinCode}`; }
+      };
       wrap.appendChild(viewBtn);
 
       const marker = L.marker([pin.lat, pin.lng], { icon })
@@ -549,16 +687,6 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
               </svg>
             </button>
 
-            {/* Locate */}
-            <button className="map-icon-btn map-locate-btn" onClick={handleLocate} title={locErr ?? 'Go to my location'}>
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                <circle cx="7.5" cy="7.5" r="3" stroke="currentColor" strokeWidth="1.4"/>
-                <path d="M7.5 1v2M7.5 12v2M1 7.5h2M12 7.5h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </button>
-
-            <div className="map-header-divider" />
-
             {/* Close / close-search */}
             <button
               className="map-icon-btn map-close-btn"
@@ -573,43 +701,72 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
 
         </div>
 
-        <div ref={mapRef} className="map-container" />
+        <div className="map-container-wrap">
+          <div ref={mapRef} className="map-container" />
+          <button className="map-locate-fab" onClick={handleLocate} title={locErr ?? 'Go to my location'}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="3.5" stroke="currentColor" strokeWidth="1.6"/>
+              <path d="M9 1v3M9 14v3M1 9h3M14 9h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
 
-        {navTarget && (
-          <div className="nav-panel">
-            <div className="nav-panel-header">
-              <div className="nav-panel-dest">
-                <span className="nav-dot-label" />
-                <div>
-                  <div className="nav-panel-name">{navTarget.name}</div>
-                  {navRoute && (
-                    <div className="nav-panel-meta">
-                      {fmtDist(navRoute.distance)} · {fmtTime(navRoute.duration)}
+        {navTarget && (() => {
+          const nextStep = navRoute?.steps?.[currentStepIdx + 1] ?? navRoute?.steps?.[navRoute.steps.length - 1];
+          const nextManeuverDist = nextStep && userPos
+            ? metersBetween(userPos, { lat: nextStep.maneuver.location[1], lng: nextStep.maneuver.location[0] })
+            : null;
+          return (
+            <div className="nav-panel">
+
+              {/* Next turn banner */}
+              {navRoute && nextStep && (
+                <div className="nav-next-turn">
+                  <div className="nav-turn-arrow">{getTurnArrow(nextStep)}</div>
+                  <div className="nav-turn-info">
+                    <div className="nav-turn-dist">
+                      {nextManeuverDist != null ? `In ${fmtDist(nextManeuverDist)}` : 'Proceed'}
                     </div>
-                  )}
+                    <div className="nav-turn-instr">{stepInstruction(nextStep)}</div>
+                  </div>
                 </div>
+              )}
+
+              {/* Route summary + destination */}
+              <div className="nav-panel-footer">
+                <div className="nav-panel-dest">
+                  <span className="nav-dot-label" />
+                  <div>
+                    <div className="nav-panel-name">{navTarget.name}</div>
+                    {navRoute && (
+                      <div className="nav-panel-meta">
+                        {fmtDist(navRoute.distance)} · {fmtTime(navRoute.duration)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button className="nav-clear-btn" onClick={clearNavigation} title="Stop navigation">✕</button>
               </div>
-              <button className="nav-clear-btn" onClick={clearNavigation} title="Stop navigation">✕</button>
+
+              {navLoading && !navRoute && <div className="nav-panel-status">Getting route…</div>}
+              {navErr && <div className={`nav-panel-err${navErr === 'Rerouting…' ? ' rerouting' : ''}`}>{navErr}</div>}
+
+              {navRoute && navRoute.steps.length > 0 && (
+                <details className="nav-steps">
+                  <summary>All steps ({navRoute.steps.length})</summary>
+                  <ol className="nav-steps-list">
+                    {navRoute.steps.map((step, i) => (
+                      <li key={i} className={i === currentStepIdx ? 'active-step' : ''}>
+                        <span className="nav-step-dist">{fmtDist(step.distance)}</span>
+                        {stepInstruction(step)}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
             </div>
-
-            {navLoading && <div className="nav-panel-status">Getting route…</div>}
-            {navErr     && <div className="nav-panel-err">{navErr}</div>}
-
-            {navRoute && navRoute.steps.length > 0 && (
-              <details className="nav-steps">
-                <summary>Turn-by-turn ({navRoute.steps.length} steps)</summary>
-                <ol className="nav-steps-list">
-                  {navRoute.steps.map((step, i) => (
-                    <li key={i}>
-                      <span className="nav-step-dist">{fmtDist(step.distance)}</span>
-                      {step.name || step.maneuver?.type || '—'}
-                    </li>
-                  ))}
-                </ol>
-              </details>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
       </div>
     </div>
