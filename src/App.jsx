@@ -4,7 +4,6 @@ import Topbar            from './components/Topbar';
 import GoogleMapView     from './components/GoogleMapView';
 import MapIntro          from './components/MapIntro';
 import OnboardingOverlay from './components/OnboardingOverlay';
-import DoneParkingBar    from './components/DoneParkingBar';
 import { TweaksPanel, TweakColor } from './components/TweaksPanel';
 import { useTweaks }    from './hooks/useTweaks';
 import { useFCM }       from './hooks/useFCM';
@@ -143,11 +142,6 @@ export default function App() {
           pinsOccupancy={pinsOccupancy}
         />
       )}
-
-      <DoneParkingBar
-        suppressed={suppressed}
-        onToggle={handleSuppressToggle}
-      />
 
       <TweaksPanel>
         <TweakColor

@@ -5,6 +5,7 @@ import L from 'leaflet';
 
 const DEFAULT_CENTER = [10.294722999317614, 123.88045512649316];
 const MAP_ZOOM = 14;
+const CEBU_BOUNDS = [[9.35, 123.25], [11.35, 124.15]]; // SW, NE of Cebu Province
 const PIN_ACTIVE_TTL = 45_000;
 
 function metersBetween(a, b) {
@@ -170,6 +171,9 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       center: DEFAULT_CENTER,
       zoom: MAP_ZOOM,
       zoomControl: true,
+      maxBounds: CEBU_BOUNDS,
+      maxBoundsViscosity: 1.0,
+      minZoom: 10,
     });
     instanceRef.current = map;
     instanceRef.current.setView(DEFAULT_CENTER, MAP_ZOOM);
@@ -177,6 +181,19 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
       maxZoom: 19,
     }).addTo(map);
+
+    // Centre on user's location if available
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          if (instanceRef.current) {
+            instanceRef.current.setView([pos.coords.latitude, pos.coords.longitude], MAP_ZOOM);
+          }
+        },
+        () => {}, // silently fall back to DEFAULT_CENTER
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 30_000 }
+      );
+    }
 
     const stopDrag = () => map.fire('mouseup');
     document.addEventListener('mouseup', stopDrag);
@@ -496,7 +513,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
     debounceRef.current = setTimeout(async () => {
       try {
         const res  = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val.trim())}&format=json&limit=5&addressdetails=1`,
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val.trim())}&format=json&limit=5&addressdetails=1&countrycodes=ph&viewbox=123.25,11.35,124.15,9.35&bounded=1`,
           { headers: { 'Accept-Language': 'en' } }
         );
         const data = await res.json();
@@ -557,7 +574,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
 
     try {
       const res  = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=ph&viewbox=123.25,11.35,124.15,9.35&bounded=1`,
         { headers: { 'Accept-Language': 'en' } }
       );
       const data = await res.json();
