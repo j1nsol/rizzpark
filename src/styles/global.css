@@ -782,6 +782,84 @@ select.twk-field{padding-right:22px;
 .pin-occ-badge.vacant { background: #22A06B; }
 .pin-occ-badge.full   { background: #D93A3A; }
 
+/* ── User location dot ── */
+.user-dot {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50%;
+  background: #4A90E2;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  animation: loc-pulse 2s ease-out infinite;
+}
+@keyframes loc-pulse {
+  0%   { box-shadow: 0 0 0 0    rgba(74,144,226,.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(74,144,226,0);  }
+  100% { box-shadow: 0 0 0 0    rgba(74,144,226,0);  }
+}
+
+/* ── Locate (crosshair) button in map header ── */
+.map-locate-btn {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--border-2); background: var(--surface);
+  color: var(--text-3); cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s;
+  box-shadow: var(--shadow-sm);
+}
+.map-locate-btn:hover { color: #4A90E2; background: var(--bg); border-color: #4A90E2; }
+
+/* ── Navigation panel (bottom of map modal) ── */
+.nav-panel {
+  border-top: 1.5px solid var(--border);
+  background: var(--surface);
+  border-radius: 0 0 var(--r) var(--r);
+  padding: 10px 14px 12px;
+  font-family: 'DM Sans', sans-serif;
+}
+.nav-panel-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.nav-panel-dest { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.nav-dot-label {
+  width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%;
+  background: #4A90E2; border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #4A90E2;
+}
+.nav-panel-name { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-panel-meta { font-size: 12px; color: var(--text-2); margin-top: 1px; }
+.nav-clear-btn {
+  width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%;
+  border: 1.5px solid var(--border-2); background: var(--bg);
+  font-size: 11px; cursor: pointer; color: var(--text-3);
+  transition: background .15s, color .15s, border-color .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.nav-clear-btn:hover { background: var(--occupied-bg); color: var(--occupied); border-color: var(--occupied-border); }
+.nav-panel-status { font-size: 12px; color: var(--text-3); padding-top: 6px; }
+.nav-panel-err    { font-size: 12px; color: var(--occupied); padding-top: 6px; }
+
+/* Steps dropdown */
+.nav-steps { margin-top: 8px; }
+.nav-steps summary {
+  font-size: 12px; font-weight: 600; color: var(--text-2);
+  cursor: pointer; padding: 4px 0; user-select: none;
+  list-style: none;
+}
+.nav-steps summary::-webkit-details-marker { display: none; }
+.nav-steps[open] summary::before { content: '▾ '; }
+.nav-steps:not([open]) summary::before { content: '▸ '; }
+.nav-steps-list {
+  margin: 6px 0 0; padding-left: 18px;
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 130px; overflow-y: auto;
+}
+.nav-steps-list li { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.nav-step-dist {
+  display: inline-block; min-width: 44px;
+  font-size: 11px; font-weight: 600; color: #4A90E2; margin-right: 6px;
+}
+
 /* ── Done Parking — sidebar bottom button (desktop only) ── */
 .sidebar-done-btn {
   margin-top: auto;

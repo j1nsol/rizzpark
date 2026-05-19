@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
 const DEFAULT_CENTER = [10.294722999317614, 123.88045512649316];
 const MAP_ZOOM = 14;
-
 const PIN_ACTIVE_TTL = 45_000;
+
+function fmtDist(m) {
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+}
+function fmtTime(s) {
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
 
 function makeMarkerIcon(isAvailable, occ) {
   let badgeHtml = '';
@@ -28,16 +35,40 @@ function makeMarkerIcon(isAvailable, occ) {
 }
 
 export default function GoogleMapView({ onClose, pins = [], activePins = null, pinsOccupancy = {}, currentPinCode = null }) {
-  const navigate        = useNavigate();
+  const navigate = useNavigate();
+
+  // Map refs
   const mapRef          = useRef(null);
   const instanceRef     = useRef(null);
   const searchMarkerRef = useRef(null);
   const fbMarkersRef    = useRef(new Map());
 
+  // User location refs
+  const userMarkerRef = useRef(null);
+  const userCircleRef = useRef(null);
+  const watchIdRef    = useRef(null);
+  const userPosRef    = useRef(null);  // always-fresh copy for DOM event handlers
+
+  // Route ref
+  const routeLayerRef        = useRef(null);
+  const startNavigationRef   = useRef(null); // stable ref so popup onclicks stay fresh
+
+  // Search state
   const [query,     setQuery]     = useState('');
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState(null);
 
+  // Location state
+  const [userPos, setUserPos] = useState(null);
+  const [locErr,  setLocErr]  = useState(null);
+
+  // Navigation state
+  const [navTarget,  setNavTarget]  = useState(null);
+  const [navRoute,   setNavRoute]   = useState(null);
+  const [navLoading, setNavLoading] = useState(false);
+  const [navErr,     setNavErr]     = useState(null);
+
+  // ── Map init ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (instanceRef.current) return;
 
@@ -58,13 +89,129 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
 
     return () => {
       document.removeEventListener('mouseup', stopDrag);
+      if (userMarkerRef.current) { userMarkerRef.current.remove(); userMarkerRef.current = null; }
+      if (userCircleRef.current) { userCircleRef.current.remove(); userCircleRef.current = null; }
+      if (routeLayerRef.current) { routeLayerRef.current.remove(); routeLayerRef.current = null; }
       map.remove();
       instanceRef.current = null;
       fbMarkersRef.current.clear();
     };
   }, []);
 
-  // Render Firebase-saved parking location pins
+  // ── Geolocation watch ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      pos => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        userPosRef.current = p;
+        setUserPos(p);
+        setLocErr(null);
+      },
+      err => {
+        if (err.code === 1) setLocErr('Location access denied');
+      },
+      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 15_000 }
+    );
+
+    return () => {
+      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+  }, []);
+
+  // ── Update user dot + accuracy circle ───────────────────────────────────
+  useEffect(() => {
+    const map = instanceRef.current;
+    if (!map || !userPos) return;
+
+    const latlng = [userPos.lat, userPos.lng];
+
+    if (userCircleRef.current) {
+      userCircleRef.current.setLatLng(latlng).setRadius(userPos.accuracy);
+    } else {
+      userCircleRef.current = L.circle(latlng, {
+        radius:      userPos.accuracy,
+        color:       '#4A90E2',
+        fillColor:   '#4A90E2',
+        fillOpacity: 0.10,
+        weight:      1,
+      }).addTo(map);
+    }
+
+    const dotIcon = L.divIcon({ className: 'user-dot', iconSize: [16, 16], iconAnchor: [8, 8] });
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng(latlng);
+    } else {
+      userMarkerRef.current = L.marker(latlng, { icon: dotIcon, zIndexOffset: 1000 }).addTo(map);
+    }
+  }, [userPos]);
+
+  // ── Navigation helpers ───────────────────────────────────────────────────
+  const fetchRoute = useCallback(async (pin, pos) => {
+    if (!pos) return;
+
+    setNavLoading(true);
+    setNavErr(null);
+
+    try {
+      const url =
+        `https://router.project-osrm.org/route/v1/driving/` +
+        `${pos.lng},${pos.lat};${pin.lng},${pin.lat}` +
+        `?overview=full&geometries=geojson&steps=true`;
+      const res  = await fetch(url);
+      const data = await res.json();
+
+      if (data.code !== 'Ok') throw new Error('No route found');
+
+      const leg = data.routes[0].legs[0];
+      setNavRoute({
+        distance: data.routes[0].distance,
+        duration: data.routes[0].duration,
+        steps:    leg.steps,
+      });
+
+      if (routeLayerRef.current) routeLayerRef.current.remove();
+      routeLayerRef.current = L.geoJSON(data.routes[0].geometry, {
+        style: { color: '#4A90E2', weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' },
+      }).addTo(instanceRef.current);
+
+      instanceRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [40, 40] });
+    } catch {
+      setNavErr('Could not get route. Check your connection.');
+    } finally {
+      setNavLoading(false);
+    }
+  }, []);
+
+  function startNavigation(pin) {
+    const pos = userPosRef.current;  // always current, not stale closure
+    if (!pos) {
+      setNavTarget(pin);
+      setNavErr('Location not available yet — please allow location access and try again.');
+      return;
+    }
+    setNavTarget(pin);
+    setNavRoute(null);
+    fetchRoute(pin, pos);
+  }
+  startNavigationRef.current = startNavigation;
+
+  function clearNavigation() {
+    setNavTarget(null);
+    setNavRoute(null);
+    setNavErr(null);
+    setNavLoading(false);
+    if (routeLayerRef.current) { routeLayerRef.current.remove(); routeLayerRef.current = null; }
+  }
+
+  // Refresh route as user moves (only when navigating)
+  useEffect(() => {
+    if (!navTarget || !userPosRef.current || navLoading) return;
+    fetchRoute(navTarget, userPosRef.current);
+  }, [userPos]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Parking pin markers ─────────────────────────────────────────────────
   useEffect(() => {
     if (!instanceRef.current) return;
 
@@ -80,7 +227,6 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       const wrap = document.createElement('div');
       wrap.style.cssText = 'display:flex;flex-direction:column;min-width:220px;font-family:"DM Sans",sans-serif;';
 
-      // ── Header: centered logo + name
       const header = document.createElement('div');
       header.style.cssText = 'padding:16px 16px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center';
       const title = document.createElement('div');
@@ -95,7 +241,6 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
         return d;
       };
 
-      // ── Occupancy section
       if (occ && occ.total > 0) {
         wrap.appendChild(divider());
         const occSection = document.createElement('div');
@@ -113,7 +258,6 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
         wrap.appendChild(occSection);
       }
 
-      // ── No camera feed notice
       if (!isAvailable) {
         wrap.appendChild(divider());
         const noFeed = document.createElement('div');
@@ -122,21 +266,38 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
         wrap.appendChild(noFeed);
       }
 
-      // ── Action button
+      // Navigate button
       wrap.appendChild(divider());
-      const navBtn = document.createElement('button');
+      const navRouteBtn = document.createElement('button');
+      navRouteBtn.textContent = '↗ Navigate';
+      navRouteBtn.style.cssText =
+        `display:block;width:100%;padding:9px 16px;border:none;` +
+        `background:#4A90E2;color:#fff;` +
+        `font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;` +
+        `cursor:pointer;letter-spacing:.01em;transition:opacity .15s`;
+      navRouteBtn.onmouseover = () => { navRouteBtn.style.opacity = '0.85'; };
+      navRouteBtn.onmouseout  = () => { navRouteBtn.style.opacity = '1'; };
+      navRouteBtn.onclick = () => {
+        instanceRef.current?.closePopup();
+        startNavigationRef.current(pin);  // always calls the latest version
+      };
+      wrap.appendChild(navRouteBtn);
+
+      // View Parking button
+      wrap.appendChild(divider());
+      const viewBtn = document.createElement('button');
       const isCurrentPin = currentPinCode === pin.pinCode;
-      navBtn.textContent = isCurrentPin ? 'Close Map' : 'View Parking →';
+      viewBtn.textContent = isCurrentPin ? 'Close Map' : 'View Parking →';
       const btnColor = isAvailable ? '#22A06B' : '#94a3b8';
-      navBtn.style.cssText =
+      viewBtn.style.cssText =
         `display:block;width:100%;padding:11px 16px;border:none;` +
         `background:${btnColor};color:#fff;` +
         `font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;` +
         `cursor:pointer;border-radius:0 0 8px 8px;letter-spacing:.01em;transition:opacity .15s`;
-      navBtn.onmouseover = () => { navBtn.style.opacity = '0.88'; };
-      navBtn.onmouseout  = () => { navBtn.style.opacity = '1'; };
-      navBtn.onclick = isCurrentPin ? onClose : () => navigate(`/${pin.pinCode}`);
-      wrap.appendChild(navBtn);
+      viewBtn.onmouseover = () => { viewBtn.style.opacity = '0.88'; };
+      viewBtn.onmouseout  = () => { viewBtn.style.opacity = '1'; };
+      viewBtn.onclick = isCurrentPin ? onClose : () => navigate(`/${pin.pinCode}`);
+      wrap.appendChild(viewBtn);
 
       const marker = L.marker([pin.lat, pin.lng], { icon })
         .addTo(instanceRef.current)
@@ -146,6 +307,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
     });
   }, [pins, activePins, pinsOccupancy]);
 
+  // ── Search ──────────────────────────────────────────────────────────────
   async function handleSearch(e) {
     e.preventDefault();
     const q = query.trim();
@@ -174,6 +336,22 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
     } finally {
       setSearching(false);
     }
+  }
+
+  // ── Locate button ───────────────────────────────────────────────────────
+  function handleLocate() {
+    const pos = userPosRef.current;
+    if (pos) {
+      instanceRef.current?.flyTo([pos.lat, pos.lng], 17, { duration: 1 });
+      return;
+    }
+    navigator.geolocation?.getCurrentPosition(
+      pos => {
+        instanceRef.current?.flyTo([pos.coords.latitude, pos.coords.longitude], 17, { duration: 1 });
+      },
+      () => setLocErr('Could not get location'),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   }
 
   function handleOverlayClick(e) {
@@ -211,6 +389,17 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
             </button>
           </form>
 
+          <button
+            className="map-locate-btn"
+            onClick={handleLocate}
+            title={locErr ?? 'Go to my location'}
+          >
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <circle cx="7.5" cy="7.5" r="3" stroke="currentColor" strokeWidth="1.4"/>
+              <path d="M7.5 1v2M7.5 12v2M1 7.5h2M12 7.5h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </button>
+
           <button className="map-close-btn" onClick={onClose} title="Close map">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -219,6 +408,42 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
         </div>
 
         <div ref={mapRef} className="map-container" />
+
+        {navTarget && (
+          <div className="nav-panel">
+            <div className="nav-panel-header">
+              <div className="nav-panel-dest">
+                <span className="nav-dot-label" />
+                <div>
+                  <div className="nav-panel-name">{navTarget.name}</div>
+                  {navRoute && (
+                    <div className="nav-panel-meta">
+                      {fmtDist(navRoute.distance)} · {fmtTime(navRoute.duration)}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button className="nav-clear-btn" onClick={clearNavigation} title="Stop navigation">✕</button>
+            </div>
+
+            {navLoading && <div className="nav-panel-status">Getting route…</div>}
+            {navErr     && <div className="nav-panel-err">{navErr}</div>}
+
+            {navRoute && navRoute.steps.length > 0 && (
+              <details className="nav-steps">
+                <summary>Turn-by-turn ({navRoute.steps.length} steps)</summary>
+                <ol className="nav-steps-list">
+                  {navRoute.steps.map((step, i) => (
+                    <li key={i}>
+                      <span className="nav-step-dist">{fmtDist(step.distance)}</span>
+                      {step.name || step.maneuver?.type || '—'}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
+          </div>
+        )}
 
       </div>
     </div>
