@@ -70,9 +70,10 @@ export default function ParkingMapSpatial({
       rowGroups[r].push(s);
     });
 
-    const edgeGap  = containerW <= 480 ? 1 : 10;
-    const MIN_X_GAP = cardW + edgeGap;
-    const maxLeft   = containerW - pad;
+    const edgeGap    = containerW <= 480 ? 1 : 10;
+    const MIN_GAP    = cardW + edgeGap;
+    const SIDE_BY_SIDE = cardW * 3.0;
+    const maxLeft    = containerW - pad;
 
     const snapped   = [];
     const rowLabels = [];
@@ -83,20 +84,25 @@ export default function ParkingMapSpatial({
         const avgTop = group.reduce((sum, s) => sum + s.top, 0) / group.length;
 
         const sorted = [...group].sort((a, b) => a.left - b.left);
+
+        const positions = [sorted[0].left];
         for (let i = 1; i < sorted.length; i++) {
-          if (sorted[i].left - sorted[i - 1].left < MIN_X_GAP) {
-            sorted[i] = { ...sorted[i], left: sorted[i - 1].left + MIN_X_GAP };
-          }
+          const naturalDist = sorted[i].left - sorted[i - 1].left;
+          const dist = naturalDist < SIDE_BY_SIDE
+            ? MIN_GAP
+            : Math.max(naturalDist, MIN_GAP);
+          positions.push(positions[i - 1] + dist);
         }
 
-        const overflow = sorted[sorted.length - 1].left - maxLeft;
-        if (overflow > 0) {
-          sorted.forEach((s, i) => { sorted[i] = { ...s, left: s.left - overflow }; });
-        }
+        const underflow = pad - positions[0];
+        if (underflow > 0) positions.forEach((_, i) => { positions[i] += underflow; });
 
-        sorted.forEach(s => snapped.push({ ...s, top: avgTop }));
+        const overflow = positions[positions.length - 1] - maxLeft;
+        if (overflow > 0) positions.forEach((_, i) => { positions[i] -= overflow; });
 
-        const groupCenterX = sorted.reduce((sum, s) => sum + s.left, 0) / sorted.length;
+        sorted.forEach((s, i) => snapped.push({ ...s, top: avgTop, left: positions[i] }));
+
+        const groupCenterX = positions.reduce((sum, x) => sum + x, 0) / positions.length;
         rowLabels.push({ label, left: groupCenterX, top: avgTop - cardH * 0.7, centerY: avgTop });
       });
 
