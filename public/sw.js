@@ -5,7 +5,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js');
 
 // ── Cache Configuration ───────────────────────────────────────────────────────
-const CACHE_NAME = 'rizzpark-v1';
+const CACHE_NAME = 'rizzpark-v2';
 const urlsToCache = [
   '/',
   '/static/js/bundle.js',
