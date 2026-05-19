@@ -1,43 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import './styles/global.css';
 import Topbar            from './components/Topbar';
-import Sidebar           from './components/Sidebar';
-import ParkingMapSpatial from './components/ParkingMapSpatial';
 import GoogleMapView     from './components/GoogleMapView';
 import MapIntro          from './components/MapIntro';
-import ToastStack        from './components/ToastStack';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import DoneParkingBar    from './components/DoneParkingBar';
+import { TweaksPanel, TweakColor } from './components/TweaksPanel';
+import { useTweaks }    from './hooks/useTweaks';
+import { useFCM }       from './hooks/useFCM';
 import {
-  TweaksPanel, TweakSection, TweakToggle, TweakColor,
-} from './components/TweaksPanel';
-import { useTweaks }         from './hooks/useTweaks';
-import { useFirebaseSlots }  from './hooks/useFirebaseSlots';
-import { useFCM }            from './hooks/useFCM';
-import {
-  canNotify, requestPerm, fireNotif, fireFullNotif, getNotificationSettings, ONBOARDING_KEY,
+  canNotify, requestPerm, getNotificationSettings, ONBOARDING_KEY,
 } from './utils/parking';
-import { setSlotOverride, saveNotificationSuppressed } from './utils/firebase';
-import { getFirebasePath } from './config/modeConfig';
+import { saveNotificationSuppressed } from './utils/firebase';
 
-const TWEAK_DEFAULTS = {
-  showCarIcon: true,
-  accentColor: '#F5A623',
-};
+const FIREBASE_URL = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+const TWEAK_DEFAULTS = { accentColor: '#F5A623' };
 
 export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { slots, fbStatus, showSelectedBox, movingCars } = useFirebaseSlots(getFirebasePath());
   const fcm = useFCM();
 
-  const [selectedId,     setSelectedId]     = useState(null);
   const [notifPerm,      setNotifPerm]      = useState(
     canNotify() ? Notification.permission : 'unavailable'
   );
   const [suppressed,     setSuppressed]     = useState(
     () => getNotificationSettings().suppressed === true
   );
-  const [toasts,         setToasts]         = useState([]);
   const [showOnboarding, setShowOnboarding] = useState(
     () => localStorage.getItem(ONBOARDING_KEY) !== '1'
   );
@@ -47,41 +36,19 @@ export default function App() {
   const [activePins,     setActivePins]     = useState(null);
   const [pinsOccupancy,  setPinsOccupancy]  = useState({});
 
-  const toastId      = useRef(0);
-  const prevSlotsRef = useRef([]);
-
-  // Update notification permission state based on FCM
   useEffect(() => {
-    if (fcm.permission) {
-      setNotifPerm(fcm.permission);
-    }
+    if (fcm.permission) setNotifPerm(fcm.permission);
   }, [fcm.permission]);
 
-  // Handle FCM messages when app is in foreground
   useEffect(() => {
-    if (!fcm.token) return;
-
-    const unsubscribe = fcm.onMessage((payload) => {
-      const slotData = payload.data || {};
-      const slotId = slotData.slotId;
-      const row = slotData.row;
-      if (slotId && row) spawnToast(slotId, row);
-    });
-
-    return unsubscribe;
-  }, [fcm.token, fcm.onMessage]);
-
-  // Load Firebase geo pins, active Pi pin, and per-pin occupancy for the map
-  useEffect(() => {
-    const base = 'https://automapping-parking-slot-default-rtdb.asia-southeast1.firebasedatabase.app';
-    fetch(`${base}/map_pins.json`)
+    fetch(`${FIREBASE_URL}/map_pins.json`)
       .then(r => r.json())
       .then(data => {
         if (data && typeof data === 'object') {
           const pinList = Object.values(data);
           setAllPins(pinList);
           pinList.forEach(pin => {
-            fetch(`${base}/locations/${pin.pinCode}/slots.json`)
+            fetch(`${FIREBASE_URL}/locations/${pin.pinCode}/slots.json`)
               .then(r => r.json())
               .then(slots => {
                 if (slots && typeof slots === 'object') {
@@ -97,71 +64,11 @@ export default function App() {
         }
       })
       .catch(() => {});
-    fetch(`${base}/pi_config/active_pins.json`)
+    fetch(`${FIREBASE_URL}/pi_config/active_pins.json`)
       .then(r => r.json())
       .then(data => { if (data && typeof data === 'object') setActivePins(data); })
       .catch(() => {});
   }, []);
-
-  // Detect occupied→vacant transitions and fire notifications + toasts
-  useEffect(() => {
-    if (!prevSlotsRef.current.length) {
-      prevSlotsRef.current = slots;
-      return;
-    }
-    const prevById = Object.fromEntries(prevSlotsRef.current.map(s => [s.id, s]));
-    const changedSlots = slots.filter(s =>
-      prevById[s.id]?.status === 'occupied' && s.status === 'vacant'
-    );
-
-    changedSlots.forEach(s => {
-      fireNotif(s);
-      spawnToast(s.id, s.row);
-    });
-
-    const prevOccupied = prevSlotsRef.current.filter(s => s.status === 'occupied').length;
-    const nowOccupied  = slots.filter(s => s.status === 'occupied').length;
-    const total = slots.length;
-    if (total > 0 && nowOccupied === total && prevOccupied < total) {
-      fireFullNotif('Ground Floor');
-    }
-
-    prevSlotsRef.current = slots;
-  }, [slots]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Derived state
-  const selectedSlot = selectedId ? (slots.find(s => s.id === selectedId) ?? null) : null;
-  const accentStyle  = {
-    '--accent':      tweaks.accentColor,
-    '--accent-pale': tweaks.accentColor + '1A',
-  };
-
-  const statusLine =
-    fbStatus === 'online'   ? 'Live data · updates every ~3 s'  :
-    fbStatus === 'checking' ? 'Connecting to live feed…'         :
-                              'Disconnected — showing last known data';
-
-  // ── Handlers ────────────────────────────────────────────────────────────────
-
-  function spawnToast(slotId, row) {
-    const id = ++toastId.current;
-    setToasts(prev => [...prev, { id, slotId, row, ts: Date.now(), out: false }]);
-    setTimeout(() => dismissToast(id), 5000);
-  }
-
-  function dismissToast(id) {
-    setToasts(p => p.map(t => (t.id === id ? { ...t, out: true } : t)));
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 300);
-  }
-
-  async function handleToggleStatus(slot) {
-    const newStatus = slot.status === 'occupied' ? 'Vacant' : 'Occupied';
-    try {
-      await setSlotOverride(slot.id, newStatus);
-    } catch (e) {
-      console.error('Failed to override slot status:', e);
-    }
-  }
 
   async function handleNotif() {
     if (notifPerm === 'granted') return;
@@ -188,7 +95,10 @@ export default function App() {
     await saveNotificationSuppressed(fcm.token, newVal);
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const accentStyle = {
+    '--accent':      tweaks.accentColor,
+    '--accent-pale': tweaks.accentColor + '1A',
+  };
 
   return (
     <div className="app" style={accentStyle}>
@@ -204,57 +114,42 @@ export default function App() {
         onSuppressToggle={handleSuppressToggle}
       />
 
-      {showMapIntro && <MapIntro onContinue={() => setShowMapIntro(false)} pins={allPins} activePins={activePins} pinsOccupancy={pinsOccupancy} />}
-
-      <div className="main" style={showMapIntro ? { display: 'none' } : {}}>
-        <Sidebar
-          slots={slots}
-          selectedSlot={selectedSlot}
-          onToggleStatus={handleToggleStatus}
-          onDeselect={() => setSelectedId(null)}
-          showSelectedBox={showSelectedBox}
+      {showMapIntro && (
+        <MapIntro
+          onContinue={() => setShowMapIntro(false)}
+          pins={allPins}
+          activePins={activePins}
+          pinsOccupancy={pinsOccupancy}
         />
+      )}
 
-        <div className="grid-area">
-          <div className="grid-topbar">
-            <div>
-              <div className="grid-title">Ground Floor — Parking Map</div>
-              <div className="grid-subtitle">{statusLine}</div>
-            </div>
-            <button className="map-view-btn" onClick={() => setShowMap(true)}>
-              <img src="/topbar-logo.png" alt="" style={{ width: 18, height: 18, objectFit: 'contain' }} />
-              Map View
-            </button>
-          </div>
-
-          <ParkingMapSpatial
-            slots={slots}
-            selected={selectedId}
-            onSelect={setSelectedId}
-            filter="all"
-            showCarIcon={tweaks.showCarIcon}
-            movingCars={movingCars}
-          />
+      {!showMapIntro && (
+        <div className="landing">
+          <img src="/topbar-logo.png" alt="" className="landing-logo" />
+          <div className="landing-title">Find Parking</div>
+          <div className="landing-sub">Open the map to see available spots near you.</div>
+          <button className="map-view-btn landing-cta" onClick={() => setShowMap(true)}>
+            <img src="/topbar-logo.png" alt="" style={{ width: 18, height: 18, objectFit: 'contain' }} />
+            Open Map
+          </button>
         </div>
-      </div>
+      )}
 
-      {showMap && <GoogleMapView onClose={() => setShowMap(false)} pins={allPins} activePins={activePins} pinsOccupancy={pinsOccupancy} />}
-
-      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      {showMap && (
+        <GoogleMapView
+          onClose={() => setShowMap(false)}
+          pins={allPins}
+          activePins={activePins}
+          pinsOccupancy={pinsOccupancy}
+        />
+      )}
 
       <DoneParkingBar
         suppressed={suppressed}
         onToggle={handleSuppressToggle}
-        notifPerm={notifPerm}
       />
 
       <TweaksPanel>
-        <TweakSection label="Display" />
-        <TweakToggle
-          label="Show car icons"
-          value={tweaks.showCarIcon}
-          onChange={v => setTweak('showCarIcon', v)}
-        />
         <TweakColor
           label="Accent color"
           value={tweaks.accentColor}

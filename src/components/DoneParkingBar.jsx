@@ -1,9 +1,8 @@
-export default function DoneParkingBar({ suppressed, onToggle, notifPerm }) {
-  if (notifPerm !== 'granted') return null;
+export default function DoneParkingBar({ suppressed, onToggle }) {
   return (
     <div className={`done-parking-bar ${suppressed ? 'suppressed' : ''}`}>
       <button className="done-parking-btn" onClick={onToggle}>
-        {suppressed ? '🔔 Resume Alerts' : '✓ Done Parking? Stop Alerts'}
+        {suppressed ? 'Resume Alerts' : 'Done Parking?'}
       </button>
     </div>
   );

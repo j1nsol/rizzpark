@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useFCM } from '../hooks/useFCM';
 import { getNotificationSettings } from '../utils/parking';
-import { saveTokenSubscribedPins } from '../utils/firebase';
+import { saveTokenSubscribedPins, saveNotificationPrefs } from '../utils/firebase';
 
 /**
  * @param {{ onClose: () => void, pins?: Array<{pinCode: string, name: string}> }} props
@@ -27,8 +27,11 @@ export default function NotificationSettings({ onClose, pins = [] }) {
     localStorage.setItem('rizzpark_notification_settings', JSON.stringify(newSettings));
   };
 
-  const handleSettingChange = (key, value) => {
+  const handleSettingChange = async (key, value) => {
     saveSettings({ ...settings, [key]: value });
+    if (['enabled', 'slotAvailable', 'parkingFull'].includes(key) && fcm.token) {
+      await saveNotificationPrefs(fcm.token, { [key]: value });
+    }
   };
 
   async function handlePinSubscription(newSubs) {

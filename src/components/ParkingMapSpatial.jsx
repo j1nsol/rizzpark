@@ -8,8 +8,6 @@ const PAD    = 64;
 
 export default function ParkingMapSpatial({
   slots       = [],
-  selected    = null,
-  onSelect    = () => {},
   showCarIcon = true,
   filter      = 'all',
   movingCars  = {},
@@ -151,8 +149,6 @@ export default function ParkingMapSpatial({
                     <ParkingSlotCard
                       key={slot.id}
                       slot={slot}
-                      isSelected={selected === slot.id}
-                      onClick={() => onSelect(selected === slot.id ? null : slot.id)}
                       theme="driver"
                       showCarIcon={showCarIcon}
                     />
@@ -190,8 +186,6 @@ export default function ParkingMapSpatial({
           }}>
             <ParkingSlotCard
               slot={slot}
-              isSelected={selected === slot.id}
-              onClick={() => onSelect(selected === slot.id ? null : slot.id)}
               theme="driver"
               showCarIcon={showCarIcon}
             />
@@ -222,8 +216,6 @@ export default function ParkingMapSpatial({
               <ParkingSlotCard
                 key={slot.id}
                 slot={slot}
-                isSelected={selected === slot.id}
-                onClick={() => onSelect(selected === slot.id ? null : slot.id)}
                 theme="driver"
                 showCarIcon={showCarIcon}
               />

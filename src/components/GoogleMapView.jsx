@@ -27,7 +27,7 @@ function makeMarkerIcon(isAvailable, occ) {
   });
 }
 
-export default function GoogleMapView({ onClose, pins = [], activePins = null, pinsOccupancy = {} }) {
+export default function GoogleMapView({ onClose, pins = [], activePins = null, pinsOccupancy = {}, currentPinCode = null }) {
   const navigate        = useNavigate();
   const mapRef          = useRef(null);
   const instanceRef     = useRef(null);
@@ -125,7 +125,8 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
       // ── Action button
       wrap.appendChild(divider());
       const navBtn = document.createElement('button');
-      navBtn.textContent = 'View Parking →';
+      const isCurrentPin = currentPinCode === pin.pinCode;
+      navBtn.textContent = isCurrentPin ? 'Close Map' : 'View Parking →';
       const btnColor = isAvailable ? '#22A06B' : '#94a3b8';
       navBtn.style.cssText =
         `display:block;width:100%;padding:11px 16px;border:none;` +
@@ -134,7 +135,7 @@ export default function GoogleMapView({ onClose, pins = [], activePins = null, p
         `cursor:pointer;border-radius:0 0 8px 8px;letter-spacing:.01em;transition:opacity .15s`;
       navBtn.onmouseover = () => { navBtn.style.opacity = '0.88'; };
       navBtn.onmouseout  = () => { navBtn.style.opacity = '1'; };
-      navBtn.onclick = () => navigate(`/${pin.pinCode}`);
+      navBtn.onclick = isCurrentPin ? onClose : () => navigate(`/${pin.pinCode}`);
       wrap.appendChild(navBtn);
 
       const marker = L.marker([pin.lat, pin.lng], { icon })

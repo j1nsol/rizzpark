@@ -5,12 +5,22 @@ export default function Topbar({ notifPerm, onNotifClick, pins = [], suppressed 
   const [showSettings, setShowSettings] = useState(false);
 
   const notifLabel =
-    notifPerm === 'granted' ? 'Alerts on' :
-    notifPerm === 'denied'  ? 'Blocked'   : 'Enable alerts';
+    notifPerm === 'granted' && suppressed ? 'Alerts off' :
+    notifPerm === 'granted'              ? 'Alerts on'  :
+    notifPerm === 'denied'               ? 'Blocked'    : 'Enable alerts';
 
   const notifClass =
-    notifPerm === 'granted' ? 'on' :
-    notifPerm === 'denied'  ? 'denied' : '';
+    notifPerm === 'granted' && suppressed ? 'off' :
+    notifPerm === 'granted'              ? 'on'   :
+    notifPerm === 'denied'               ? 'denied' : '';
+
+  function handleNotifClick() {
+    if (notifPerm === 'granted' && suppressed) {
+      onSuppressToggle?.();
+    } else {
+      onNotifClick();
+    }
+  }
 
   return (
     <header className="topbar">
@@ -27,23 +37,13 @@ export default function Topbar({ notifPerm, onNotifClick, pins = [], suppressed 
           LIVE
         </div>
 
-        {notifPerm === 'granted' && onSuppressToggle && (
-          <button
-            className={`suppress-btn ${suppressed ? 'suppressed' : ''}`}
-            onClick={onSuppressToggle}
-            title={suppressed ? 'Resume parking alerts' : 'Suppress parking alerts'}
-          >
-            {suppressed ? '▶ Resume Alerts' : '⏸ Done Parking?'}
-          </button>
-        )}
-
         <button
           className={`notif-btn ${notifClass}`}
-          onClick={onNotifClick}
+          onClick={handleNotifClick}
           title={
-            notifPerm === 'granted'
-              ? 'Notifications active'
-              : 'Enable push notifications'
+            notifPerm === 'granted' && suppressed ? 'Resume alerts' :
+            notifPerm === 'granted'               ? 'Notifications active' :
+                                                    'Enable push notifications'
           }
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -52,6 +52,9 @@ export default function Topbar({ notifPerm, onNotifClick, pins = [], suppressed 
               stroke="currentColor" strokeWidth="1.3"
             />
             <path d="M5.5 10a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.3" />
+            {notifPerm === 'granted' && suppressed && (
+              <path d="M1.5 12.5L12.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            )}
           </svg>
           <span className="notif-label">{notifLabel}</span>
         </button>

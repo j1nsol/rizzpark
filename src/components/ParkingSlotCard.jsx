@@ -82,7 +82,7 @@ export default function ParkingSlotCard({ slot, isSelected, onClick, theme = 'dr
   ].filter(Boolean).join(' ');
 
   return (
-    <div className={classes} onClick={onClick} title={`Slot ${slot.id} — ${slot.status}`}>
+    <div className={classes} onClick={onClick} data-status={slot.status} title={`Slot ${slot.id} — ${slot.status}`}>
       <div className="slot-status-dot" />
 
       {showCarIcon ? (

@@ -1,32 +1,9 @@
-import { timeAgo } from '../utils/parking';
-import { clearSlotOverride } from '../utils/firebase';
-
-export default function Sidebar({
-  slots,
-  selectedSlot,
-  onToggleStatus,
-  onDeselect,
-  onClearOverride,
-  showSelectedBox = true,
-}) {
+export default function Sidebar({ slots, suppressed, onToggle, notifPerm }) {
   const total    = slots.length;
   const vacant   = slots.filter((s) => s.status === 'vacant').length;
   const occupied = slots.filter((s) => s.status === 'occupied').length;
   const reserved = slots.filter((s) => s.status === 'reserved').length;
   const occPct   = Math.round((occupied / total) * 100);
-
-  async function handleClearOverride() {
-    if (!selectedSlot) return;
-    try {
-      if (onClearOverride) {
-        await onClearOverride(selectedSlot.id);
-      } else {
-        await clearSlotOverride(selectedSlot.id);
-      }
-    } catch (e) {
-      console.error('Failed to clear override:', e);
-    }
-  }
 
   return (
     <aside className="sidebar">
@@ -70,49 +47,13 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Selected slot detail — hidden when admin disables it */}
-      {showSelectedBox && (
-        <div>
-          <div className="sidebar-section-title">Selected Slot</div>
-          {!selectedSlot ? (
-            <div className="slot-detail empty">Click a slot on the map to see details</div>
-          ) : (
-            <div className="slot-detail">
-              <div className="sd-id">
-                {selectedSlot.id}
-                {selectedSlot.isOverridden && (
-                  <span className="sd-override-badge">Manual</span>
-                )}
-              </div>
-              <div className="sd-row"><span>Row</span><b>{selectedSlot.row}</b></div>
-              <div className="sd-row"><span>Column</span><b>{selectedSlot.col}</b></div>
-              <div className="sd-row">
-                <span>Status</span>
-                <b style={{ color: selectedSlot.status === 'vacant' ? 'var(--vacant)' : selectedSlot.status === 'reserved' ? 'var(--reserved)' : 'var(--occupied)' }}>
-                  {selectedSlot.status.charAt(0).toUpperCase() + selectedSlot.status.slice(1)}
-                </b>
-              </div>
-              <div className="sd-row">
-                <span>Updated</span>
-                <b>{timeAgo(selectedSlot.updatedAt)}</b>
-              </div>
-              <div className="sd-actions">
-                <button
-                  className={`sd-btn ${selectedSlot.status === 'occupied' ? 'primary' : 'danger'}`}
-                  onClick={() => onToggleStatus(selectedSlot)}
-                >
-                  {selectedSlot.status === 'occupied' ? '✓ Mark as Vacant' : '✗ Mark as Occupied'}
-                </button>
-                {selectedSlot.isOverridden && (
-                  <button className="sd-btn sd-btn-reset" onClick={handleClearOverride}>
-                    ↺ Reset to Auto
-                  </button>
-                )}
-                <button className="sd-btn" onClick={onDeselect}>Deselect</button>
-              </div>
-            </div>
-          )}
-        </div>
+      {notifPerm === 'granted' && onToggle && (
+        <button
+          className={`sidebar-done-btn${suppressed ? ' suppressed' : ''}`}
+          onClick={onToggle}
+        >
+          {suppressed ? 'Resume Alerts' : 'Done Parking?'}
+        </button>
       )}
     </aside>
   );
