@@ -946,6 +946,7 @@ select.twk-field{padding-right:22px;
 .nav-panel-status { font-size: 12px; color: var(--text-3); padding: 0 14px 8px; }
 .nav-panel-err    { font-size: 12px; color: var(--occupied); padding: 0 14px 8px; }
 .nav-panel-err.rerouting { color: #F97316; }
+.notif-err { font-size: 12px; color: var(--occupied, #e53e3e); margin: 4px 0 0; padding: 4px 0; }
 
 /* Steps dropdown */
 .nav-steps { margin: 0; border-top: 1px solid var(--border); }

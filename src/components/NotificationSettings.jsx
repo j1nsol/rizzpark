@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useFCM } from '../hooks/useFCM';
-import { getNotificationSettings } from '../utils/parking';
+import { getNotificationSettings, canNotify, requestPerm, isQuietHours } from '../utils/parking';
 import { saveTokenSubscribedPins, saveNotificationPrefs } from '../utils/firebase';
 
 /**
- * @param {{ onClose: () => void, pins?: Array<{pinCode: string, name: string}> }} props
+ * @param {{ onClose: () => void, pins?: Array<{pinCode: string, name: string}>, fcm: object, suppressed?: boolean, onSuppressToggle?: () => void, onPermChange?: (perm: string) => void }} props
  */
-export default function NotificationSettings({ onClose, pins = [] }) {
-  const fcm = useFCM();
+export default function NotificationSettings({ onClose, pins = [], fcm = {}, suppressed = false, onSuppressToggle, onPermChange }) {
   const [settings, setSettings] = useState(getNotificationSettings);
   const [allLocations, setAllLocations] = useState(
     () => {
@@ -15,12 +13,16 @@ export default function NotificationSettings({ onClose, pins = [] }) {
       return !s.subscribedPins || s.subscribedPins.includes('all');
     }
   );
+  const [notifErr, setNotifErr] = useState(null);
 
   useEffect(() => {
     const s = getNotificationSettings();
     setSettings(s);
     setAllLocations(!s.subscribedPins || s.subscribedPins.includes('all'));
   }, []);
+
+  // The master "on" state: permission granted AND not suppressed
+  const notifEnabled = fcm.permission === 'granted' && !suppressed;
 
   const saveSettings = (newSettings) => {
     setSettings(newSettings);
@@ -29,7 +31,7 @@ export default function NotificationSettings({ onClose, pins = [] }) {
 
   const handleSettingChange = async (key, value) => {
     saveSettings({ ...settings, [key]: value });
-    if (['enabled', 'slotAvailable', 'parkingFull'].includes(key) && fcm.token) {
+    if (['slotAvailable', 'parkingFull'].includes(key) && fcm.token) {
       await saveNotificationPrefs(fcm.token, { [key]: value });
     }
   };
@@ -37,7 +39,7 @@ export default function NotificationSettings({ onClose, pins = [] }) {
   async function handlePinSubscription(newSubs) {
     const newSettings = { ...settings, subscribedPins: newSubs };
     saveSettings(newSettings);
-    await saveTokenSubscribedPins(fcm.token, newSubs);
+    if (fcm.token) await saveTokenSubscribedPins(fcm.token, newSubs);
   }
 
   function toggleAllLocations(checked) {
@@ -59,21 +61,29 @@ export default function NotificationSettings({ onClose, pins = [] }) {
   }
 
   const handleEnableNotifications = async () => {
+    setNotifErr(null);
     try {
-      await fcm.requestPermission();
-      handleSettingChange('enabled', true);
-    } catch {}
+      if (fcm.isSupported) {
+        await fcm.requestPermission();
+      } else {
+        const ok = await requestPerm();
+        if (!ok) throw new Error(
+          canNotify() && Notification.permission === 'denied'
+            ? 'Notifications are blocked. Enable them in your browser settings.'
+            : 'Permission not granted.'
+        );
+      }
+      saveSettings({ ...settings, enabled: true });
+      onPermChange?.('granted');
+      if (suppressed) onSuppressToggle?.();
+    } catch (err) {
+      setNotifErr(err.message || 'Could not enable notifications.');
+    }
   };
 
-  const isQuietHours = () => {
-    if (!settings.quietHours) return false;
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    return currentTime >= settings.quietStart || currentTime <= settings.quietEnd;
-  };
-
-  const shouldShowNotification = () => {
-    return settings.enabled && settings.slotAvailable && !isQuietHours();
+  const handleTurnOff = () => {
+    saveSettings({ ...settings, enabled: false });
+    if (!suppressed) onSuppressToggle?.();
   };
 
   return (
@@ -90,21 +100,22 @@ export default function NotificationSettings({ onClose, pins = [] }) {
             <label className="setting-label">
               <span>Push Notifications</span>
               <span className="setting-description">
-                {fcm.token ? 'Active' : 'Not configured'}
+                {fcm.token ? 'Active' : fcm.permission === 'granted' ? 'Registered' : 'Not configured'}
               </span>
             </label>
             <div className="toggle-switch">
-              {settings.enabled ? (
-                <button className="toggle-btn active" onClick={() => handleSettingChange('enabled', false)}>
+              {notifEnabled ? (
+                <button className="toggle-btn active" onClick={handleTurnOff}>
                   ON
                 </button>
               ) : (
-                <button className="toggle-btn" onClick={handleEnableNotifications} disabled={!fcm.isSupported}>
+                <button className="toggle-btn" onClick={handleEnableNotifications}>
                   OFF
                 </button>
               )}
             </div>
           </div>
+          {notifErr && <div className="notif-err">{notifErr}</div>}
 
           {fcm.isSupported && (
             <>
@@ -264,13 +275,13 @@ export default function NotificationSettings({ onClose, pins = [] }) {
                   <div className="status-item">
                     <span>Permission:</span>
                     <span className={`status-value ${fcm.permission === 'granted' ? 'good' : 'bad'}`}>
-                      {fcm.permission}
+                      {fcm.permission || 'default'}
                     </span>
                   </div>
                   <div className="status-item">
                     <span>Current Status:</span>
-                    <span className={`status-value ${shouldShowNotification() ? 'good' : 'warning'}`}>
-                      {shouldShowNotification() ? 'Active' : 'Quiet Hours'}
+                    <span className={`status-value ${notifEnabled && !isQuietHours() ? 'good' : 'warning'}`}>
+                      {notifEnabled && isQuietHours() ? 'Quiet Hours' : notifEnabled ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                 </div>
