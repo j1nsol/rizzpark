@@ -111,8 +111,6 @@ export default function App() {
         pins={allPins}
         suppressed={suppressed}
         onSuppressToggle={handleSuppressToggle}
-        fcm={fcm}
-        onPermChange={perm => setNotifPerm(perm)}
       />
 
       {showMapIntro && (

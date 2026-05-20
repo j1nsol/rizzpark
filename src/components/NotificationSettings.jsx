@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { getNotificationSettings, canNotify, requestPerm, isQuietHours } from '../utils/parking';
+import { useFCM } from '../hooks/useFCM';
+import { getNotificationSettings, canNotify, requestPerm } from '../utils/parking';
 import { saveTokenSubscribedPins, saveNotificationPrefs } from '../utils/firebase';
 
 /**
- * @param {{ onClose: () => void, pins?: Array<{pinCode: string, name: string}>, fcm: object, suppressed?: boolean, onSuppressToggle?: () => void, onPermChange?: (perm: string) => void }} props
+ * @param {{ onClose: () => void, pins?: Array<{pinCode: string, name: string}> }} props
  */
-export default function NotificationSettings({ onClose, pins = [], fcm = {}, suppressed = false, onSuppressToggle, onPermChange }) {
+export default function NotificationSettings({ onClose, pins = [] }) {
+  const fcm = useFCM();
   const [settings, setSettings] = useState(getNotificationSettings);
   const [allLocations, setAllLocations] = useState(
     () => {
@@ -13,16 +15,12 @@ export default function NotificationSettings({ onClose, pins = [], fcm = {}, sup
       return !s.subscribedPins || s.subscribedPins.includes('all');
     }
   );
-  const [notifErr, setNotifErr] = useState(null);
 
   useEffect(() => {
     const s = getNotificationSettings();
     setSettings(s);
     setAllLocations(!s.subscribedPins || s.subscribedPins.includes('all'));
   }, []);
-
-  // The master "on" state: permission granted AND not suppressed
-  const notifEnabled = fcm.permission === 'granted' && !suppressed;
 
   const saveSettings = (newSettings) => {
     setSettings(newSettings);
@@ -31,7 +29,7 @@ export default function NotificationSettings({ onClose, pins = [], fcm = {}, sup
 
   const handleSettingChange = async (key, value) => {
     saveSettings({ ...settings, [key]: value });
-    if (['slotAvailable', 'parkingFull'].includes(key) && fcm.token) {
+    if (['enabled', 'slotAvailable', 'parkingFull'].includes(key) && fcm.token) {
       await saveNotificationPrefs(fcm.token, { [key]: value });
     }
   };
@@ -39,7 +37,7 @@ export default function NotificationSettings({ onClose, pins = [], fcm = {}, sup
   async function handlePinSubscription(newSubs) {
     const newSettings = { ...settings, subscribedPins: newSubs };
     saveSettings(newSettings);
-    if (fcm.token) await saveTokenSubscribedPins(fcm.token, newSubs);
+    await saveTokenSubscribedPins(fcm.token, newSubs);
   }
 
   function toggleAllLocations(checked) {
@@ -60,6 +58,8 @@ export default function NotificationSettings({ onClose, pins = [], fcm = {}, sup
     handlePinSubscription(next.length > 0 ? next : pins.map(p => p.pinCode));
   }
 
+  const [notifErr, setNotifErr] = useState(null);
+
   const handleEnableNotifications = async () => {
     setNotifErr(null);
     try {
@@ -68,22 +68,26 @@ export default function NotificationSettings({ onClose, pins = [], fcm = {}, sup
       } else {
         const ok = await requestPerm();
         if (!ok) throw new Error(
-          canNotify() && Notification.permission === 'denied'
+          Notification.permission === 'denied'
             ? 'Notifications are blocked. Enable them in your browser settings.'
             : 'Permission not granted.'
         );
       }
-      saveSettings({ ...settings, enabled: true });
-      onPermChange?.('granted');
-      if (suppressed) onSuppressToggle?.();
+      handleSettingChange('enabled', true);
     } catch (err) {
       setNotifErr(err.message || 'Could not enable notifications.');
     }
   };
 
-  const handleTurnOff = () => {
-    saveSettings({ ...settings, enabled: false });
-    if (!suppressed) onSuppressToggle?.();
+  const isQuietHours = () => {
+    if (!settings.quietHours) return false;
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    return currentTime >= settings.quietStart || currentTime <= settings.quietEnd;
+  };
+
+  const shouldShowNotification = () => {
+    return settings.enabled && settings.slotAvailable && !isQuietHours();
   };
 
   return (
@@ -100,12 +104,12 @@ export default function NotificationSettings({ onClose, pins = [], fcm = {}, sup
             <label className="setting-label">
               <span>Push Notifications</span>
               <span className="setting-description">
-                {fcm.token ? 'Active' : fcm.permission === 'granted' ? 'Registered' : 'Not configured'}
+                {fcm.token ? 'Active' : 'Not configured'}
               </span>
             </label>
             <div className="toggle-switch">
-              {notifEnabled ? (
-                <button className="toggle-btn active" onClick={handleTurnOff}>
+              {settings.enabled ? (
+                <button className="toggle-btn active" onClick={() => handleSettingChange('enabled', false)}>
                   ON
                 </button>
               ) : (
@@ -275,13 +279,13 @@ export default function NotificationSettings({ onClose, pins = [], fcm = {}, sup
                   <div className="status-item">
                     <span>Permission:</span>
                     <span className={`status-value ${fcm.permission === 'granted' ? 'good' : 'bad'}`}>
-                      {fcm.permission || 'default'}
+                      {fcm.permission}
                     </span>
                   </div>
                   <div className="status-item">
                     <span>Current Status:</span>
-                    <span className={`status-value ${notifEnabled && !isQuietHours() ? 'good' : 'warning'}`}>
-                      {notifEnabled && isQuietHours() ? 'Quiet Hours' : notifEnabled ? 'Active' : 'Inactive'}
+                    <span className={`status-value ${shouldShowNotification() ? 'good' : 'warning'}`}>
+                      {shouldShowNotification() ? 'Active' : 'Quiet Hours'}
                     </span>
                   </div>
                 </div>

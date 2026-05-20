@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import NotificationSettings from './NotificationSettings';
 
-export default function Topbar({ notifPerm, onNotifClick, pins = [], suppressed = false, onSuppressToggle, fcm, onPermChange }) {
+export default function Topbar({ notifPerm, onNotifClick, pins = [], suppressed = false, onSuppressToggle }) {
   const [showSettings, setShowSettings] = useState(false);
 
   const notifLabel =
@@ -74,14 +74,7 @@ export default function Topbar({ notifPerm, onNotifClick, pins = [], suppressed 
       </div>
 
       {showSettings && (
-        <NotificationSettings
-          onClose={() => setShowSettings(false)}
-          pins={pins}
-          fcm={fcm}
-          suppressed={suppressed}
-          onSuppressToggle={onSuppressToggle}
-          onPermChange={onPermChange}
-        />
+        <NotificationSettings onClose={() => setShowSettings(false)} pins={pins} />
       )}
     </header>
   );
